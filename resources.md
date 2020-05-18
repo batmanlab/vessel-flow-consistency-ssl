@@ -3,5 +3,7 @@
 * Mesh to Signed Distance: https://github.com/marian42/mesh_to_sdf
 * Triangular mesh analysis: https://github.com/mikedh/trimesh
 
+# Visualization tools
+* how to use Slicer in jupyter notebook: https://github.com/Slicer/SlicerNotebooks
 
 
