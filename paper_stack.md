@@ -20,3 +20,4 @@
 - [ ] Real-World Usage Scenarios of Deep Vessel Segmentation for Retinography https://arxiv.org/pdf/1909.03856.pdf
 - [ ] DeepVessel https://bit.ly/2zTHDIZ
 - [ ] A retinal vessel detection approach using convolution neural network with reinforcement sample learning strategy https://www.sciencedirect.com/science/article/pii/S0263224118303841
+- [ ] Retinal Image Analysis using Sub-Riemannian Geometry in SE(2)  https://erikbekkers.bitbucket.io/data/Bekkers_EJ_PhD_Thesis.pdf
