@@ -6,4 +6,3 @@
 # Visualization tools
 * how to use Slicer in jupyter notebook: https://github.com/Slicer/SlicerNotebooks
 
-
