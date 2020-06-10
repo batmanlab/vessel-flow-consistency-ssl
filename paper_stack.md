@@ -21,3 +21,7 @@
 - [x] DeepVessel https://bit.ly/2zTHDIZ
 - [ ] A retinal vessel detection approach using convolution neural network with reinforcement sample learning strategy https://www.sciencedirect.com/science/article/pii/S0263224118303841
 - [ ] Retinal Image Analysis using Sub-Riemannian Geometry in SE(2)  https://erikbekkers.bitbucket.io/data/Bekkers_EJ_PhD_Thesis.pdf
+
+
+
+- [ ] Recent advances in directional statistics  https://arxiv.org/abs/2005.06889
