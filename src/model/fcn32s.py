@@ -6,11 +6,10 @@ from base import BaseModel
 
 class FCN32s(BaseModel):
 
-    def __init__(self, inp_channels=3, n_class=1):
+    def __init__(self, inp_channels=3, out_channels=4):
         super(FCN32s, self).__init__()
         self.inp_channels = inp_channels
-        self.n_class=1
-        self.out_channels = 3 if n_class == 1 else 12
+        self.out_channels = out_channels
         # conv1
         self.conv1_1 = nn.Conv2d(inp_channels, 64, 3, padding=1)
         self.relu1_1 = nn.ReLU(inplace=True)
@@ -64,7 +63,7 @@ class FCN32s(BaseModel):
                 m.weight.data.copy_(initial_weight)
 
     def forward(self, x):
-        h = x
+        h = x['image']
         h = self.relu1_1(self.conv1_1(h))
         h = self.relu1_2(self.conv1_2(h))
 

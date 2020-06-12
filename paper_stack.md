@@ -22,6 +22,6 @@
 - [ ] A retinal vessel detection approach using convolution neural network with reinforcement sample learning strategy https://www.sciencedirect.com/science/article/pii/S0263224118303841
 - [ ] Retinal Image Analysis using Sub-Riemannian Geometry in SE(2)  https://erikbekkers.bitbucket.io/data/Bekkers_EJ_PhD_Thesis.pdf
 
-
+- [ ] A Deep Learning Design for Improving Topology Coherence in Blood Vessel Segmentation https://link.springer.com/chapter/10.1007/978-3-030-32239-7_11
 
 - [ ] Recent advances in directional statistics  https://arxiv.org/abs/2005.06889
