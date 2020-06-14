@@ -10,16 +10,22 @@ def L1(i1, i2=0):
 def L2(i1, i2=0):
     return torch.mean((i1 - i2)**2)
 
+def CE(i1, i2, eps=1e-10):
+    out = -i1*torch.log(i2 + eps) - (1 - i1)*torch.log(1 - i2 + eps)
+    return torch.mean(out)
+
 # Have a dictionary of keys to loss functions
 LOSS_FNs = {
         'L1': L1,
         'L2': L2,
+        'CE': CE,
 }
 
 def get_grid(image):
     ''' Return an affine grid in range [-1, 1] '''
     B = image.shape[0]
-    grid = torch.tensor([[1, 0, 0], [0, 1, 0]])[None]
+    grid = torch.FloatTensor([[1, 0, 0], [0, 1, 0]])[None]
+    grid = grid.to(image.device)
     grid = grid.repeat(B, 1, 1)
     grid = F.affine_grid(grid, image.size(), align_corners=True)
     xx, yy = grid[..., 0], grid[..., 1]
@@ -45,7 +51,7 @@ def large2smallgrid(xx, yy, size):
     return xx, yy
 
 
-def resample_from_flow_2d(image, flow)
+def resample_from_flow_2d(image, flow):
     '''
     Given an image and flow vector, get the new image
     '''
@@ -73,7 +79,7 @@ def flow_consistency_2d(parent, child):
     size = parent.size()
 
     xx, yy = get_grid(parent)
-    xx, yy = small2largegrid(xx, yy, size))
+    xx, yy = small2largegrid(xx, yy, size)
     # Find parent values
     xp = xx + parent[:, 0]
     yp = yy + parent[:, 1]
@@ -94,6 +100,7 @@ def vessel_loss_2d(output, data, config):
     # Get all parameters
     num_dir = args['num_directions'] # Determine the directions
     unc = args['uncertainty'] # whether to use kappa uncertainty
+    eps = args['eps']
     L_loss = LOSS_FNs[args['loss_intensity']]
     # Weights for different parts of total loss
     l_intensity = args.get('lambda_intensity')
@@ -105,7 +112,7 @@ def vessel_loss_2d(output, data, config):
     # Get outputs and inputs
     recon = output['recon']
     vessel = output['vessel']
-    image = output['image']
+    image = data['image']
 
     # Now use the losses given in the config
     if num_dir == 2 and not unc:
@@ -124,7 +131,7 @@ def vessel_loss_2d(output, data, config):
             loss = loss + l_consistency * L2(flow_consistency_2d(v1, v2))
         # Check for cosine similarity
         if l_cosine:
-            loss = loss + l_cosine * F.cosine_similarity(v1, v2).mean()
+            loss = loss + l_cosine * (1 + F.cosine_similarity(v1, v2).mean())  # adding 1 so that minimum value of loss is 0
         # Check for decoder
         if l_decoder:
             loss = loss + l_decoder * L2(image, recon)

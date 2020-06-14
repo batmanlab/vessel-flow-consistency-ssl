@@ -1,4 +1,5 @@
 import os
+import numpy as np
 from os import path as osp
 import torch
 from torch.utils.data import Dataset
@@ -23,21 +24,37 @@ class DriveDataset(Dataset):
             break
 
     def __len__(self,):
-        return len(self.images)
+        if not self.train:
+            return len(self.images)
+        return 2*len(self.images)
 
     def __getitem__(self, idx):
+        flip = 0
+        if self.train:
+            flip = idx%2
+            idx = idx//2
+
         mask = self.masks[idx]
-        mask = np.array(Image.open(mask))/255.0
+        mask = Image.open(mask)
+        if flip:
+            mask = mask.transpose(Image.FLIP_LEFT_RIGHT)
+        mask = np.array(mask)/255.0
+        mask = 2*mask - 1
         mask = mask[None]
 
         if not self.toy:
             img = self.images[idx]
-            img = np.array(Image.open(img))/255.0
+            img = Image.open(img)
+            if flip:
+                img = img.transpose(Image.FLIP_LEFT_RIGHT)
+            img = np.array(img)/255.0
+            img = 2*img - 1
             img = img.transpose(2, 0, 1)
         else:
             img = mask + 0
         # Return [C, H, W] image and [1, H, W]
+        #print(img.min(), img.max(), mask.min(), mask.max())
         return {
-            'image': torch.tensor(img),
-            'mask' : torch.tensor(mask),
+            'image': torch.FloatTensor(img),
+            'mask' : torch.FloatTensor(mask),
         }
