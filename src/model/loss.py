@@ -99,6 +99,8 @@ def vessel_loss_2d(output, data, config):
     l_intensity = args.get('lambda_intensity')
     l_consistency = args.get('lambda_consistency')
     l_cosine = args.get('lambda_cosine')
+    l_decoder = args.get('lambda_decoder')
+    l_length = args.get('lambda_length')
 
     # Get outputs and inputs
     recon = output['recon']
@@ -123,9 +125,17 @@ def vessel_loss_2d(output, data, config):
         # Check for cosine similarity
         if l_cosine:
             loss = loss + l_cosine * F.cosine_similarity(v1, v2).mean()
-
-
+        # Check for decoder
+        if l_decoder:
+            loss = loss + l_decoder * L2(image, recon)
+        # Check for length of vector
+        if l_length:
+            v1norm = (v1**2).sum(1) + eps
+            v2norm = (v2**2).sum(1) + eps
+            loss = loss + l_length * (L2(1./v1norm) + L2(1./v2norm))
 
     else:
         raise NotImplementedError
 
+    # Return loss
+    return loss

@@ -17,3 +17,11 @@ def top_k_acc(output, target, k=3):
         for i in range(k):
             correct += torch.sum(pred[:, i] == target).item()
     return correct / len(target)
+
+# Metrics for vessel segmentation
+def recon_error(output, data):
+    recon = output['recon']
+    vessel = output['vessel']
+    image = output['image']
+    return torch.mean((image - recon)**2)
+

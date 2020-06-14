@@ -6,9 +6,10 @@ from PIL import Image
 
 class DriveDataset(Dataset):
 
-    def __init__(self, data_dir, train=True):
+    def __init__(self, data_dir, train=True, toy=False):
         self.data_dir = data_dir
         self.train = train
+        self.toy = toy
         self.trainstr = 'training' if train else 'test'
         # Load images
         for r, dirs, images in os.walk(osp.join(self.data_dir, self.trainstr, 'images')):
@@ -25,12 +26,18 @@ class DriveDataset(Dataset):
         return len(self.images)
 
     def __getitem__(self, idx):
-        img = self.images[idx]
-        img = np.array(Image.open(img))/255.0
         mask = self.masks[idx]
         mask = np.array(Image.open(mask))/255.0
+        mask = mask[None]
+
+        if not self.toy:
+            img = self.images[idx]
+            img = np.array(Image.open(img))/255.0
+            img = img.transpose(2, 0, 1)
+        else:
+            img = mask + 0
         # Return [C, H, W] image and [1, H, W]
         return {
-            'image': torch.tensor(img.transpose(2, 0, 1)),
-            'mask' : torch.tensor(mask[None]),
+            'image': torch.tensor(img),
+            'mask' : torch.tensor(mask),
         }

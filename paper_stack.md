@@ -25,3 +25,5 @@
 - [ ] A Deep Learning Design for Improving Topology Coherence in Blood Vessel Segmentation https://link.springer.com/chapter/10.1007/978-3-030-32239-7_11
 
 - [ ] Recent advances in directional statistics  https://arxiv.org/abs/2005.06889
+
+- [ ] VE-LLI-VO: Vessel Enhancement Using Local Line Integrals and Variational Optimization https://pubmed.ncbi.nlm.nih.gov/21138806/

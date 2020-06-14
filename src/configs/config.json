@@ -1,32 +1,36 @@
 {
-    "name": "Mnist_LeNet",
-    "n_gpu": 1,
+    "name": "drive_vessel_toy",
+    "n_gpu": 2,
 
     "arch": {
-        "type": "MnistModel",
-        "args": {}
+        "type": "FCN32s",
+        "args": {
+            "inp_channels": 1,
+            "out_channels": 4,
+        }
     },
     "data_loader": {
-        "type": "MnistDataLoader",
+        "type": "DRIVEDataLoader",
         "args":{
-            "data_dir": "data/",
-            "batch_size": 128,
+            "data_dir": "/data/",
+            "batch_size": 32,
             "shuffle": true,
-            "validation_split": 0.1,
-            "num_workers": 2
+            "validation_split": 0,
+            "num_workers": 2,
+            "toy": true,
         }
     },
     "optimizer": {
         "type": "Adam",
         "args":{
             "lr": 0.001,
-            "weight_decay": 0,
+            "weight_decay": 1e-5,
             "amsgrad": true
         }
     },
-    "loss": "nll_loss",
+    "loss": "vessel_loss_2d",
     "metrics": [
-        "accuracy", "top_k_acc"
+        "recon_error",
     ],
     "lr_scheduler": {
         "type": "StepLR",
@@ -37,13 +41,11 @@
     },
     "trainer": {
         "epochs": 100,
-
-        "save_dir": "saved/",
+        "save_dir": "/saved/",
         "save_period": 1,
         "verbosity": 2,
         "monitor": "min val_loss",
         "early_stop": 10,
-
         "tensorboard": true
     }
 }
