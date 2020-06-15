@@ -64,15 +64,10 @@ class FCN32s(BaseModel):
 
     def _initialize_weights(self):
         for m in self.modules():
-            if isinstance(m, nn.Conv2d):
+            if False and isinstance(m, nn.Conv2d):
                 m.weight.data.zero_()
                 if m.bias is not None:
                     m.bias.data.zero_()
-            if isinstance(m, nn.ConvTranspose2d):
-                assert m.kernel_size[0] == m.kernel_size[1]
-                initial_weight = get_upsampling_weight(
-                    m.in_channels, m.out_channels, m.kernel_size[0])
-                m.weight.data.copy_(initial_weight)
 
     def forward(self, x):
         h = x['image']
