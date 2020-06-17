@@ -4,3 +4,4 @@ rough_notes.pdf
 *.pdf
 src/tags
 *.job
+*.out

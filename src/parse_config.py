@@ -67,7 +67,7 @@ class ConfigParser:
             assert args.config is not None, msg_no_cfg
             resume = None
             cfg_fname = Path(args.config)
-        
+
         config = read_json(cfg_fname)
         if args.config and resume:
             # update new config for fine-tuning
@@ -75,7 +75,8 @@ class ConfigParser:
 
         # parse custom cli options into dictionary
         modification = {opt.target : getattr(args, _get_opt_name(opt.flags)) for opt in options}
-        return cls(config, resume, modification)
+        run_id = args.run_id
+        return cls(config, resume, modification, run_id)
 
     def init_obj(self, name, module, *args, **kwargs):
         """

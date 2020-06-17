@@ -26,30 +26,36 @@ class DriveDataset(Dataset):
     def __len__(self,):
         if not self.train:
             return len(self.images)
-        return 2*len(self.images)
+        return 8*len(self.images)
 
     def __getitem__(self, idx):
         flip = 0
+        rot = 0
         if self.train:
-            flip = idx%2
-            idx = idx//2
+            flip = idx%8
+            flip, rot = flip%2, flip//2
+            idx = idx//8
 
         mask = self.masks[idx]
-        mask = Image.open(mask)
+        mask = Image.open(mask).resize((256, 256))
         if flip:
             mask = mask.transpose(Image.FLIP_LEFT_RIGHT)
+        mask = mask.rotate(90*rot)
         mask = np.array(mask)/255.0
         mask = 2*mask - 1
         mask = mask[None]
 
         if not self.toy:
             img = self.images[idx]
-            img = Image.open(img)
+            img = Image.open(img).resize((256, 256))
             if flip:
                 img = img.transpose(Image.FLIP_LEFT_RIGHT)
-            img = np.array(img)/255.0
+            img = img.rotate(90*rot)
+            img = img.convert('LA')
+            img = np.array(img)[..., 0]/255.0
             img = 2*img - 1
-            img = img.transpose(2, 0, 1)
+            img = img[None]
+            #img = img.transpose(2, 0, 1)
         else:
             img = mask + 0
         # Return [C, H, W] image and [1, H, W]

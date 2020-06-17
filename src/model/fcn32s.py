@@ -26,31 +26,31 @@ class FCN32s(BaseModel):
         self.bn2_2 = nn.BatchNorm2d(32)
 
         # conv3
-        self.conv3_1 = nn.Conv2d(32, 32, 3, padding=1)
+        self.conv3_1 = nn.Conv2d(32, 32, 5, padding=2)
         self.relu3_1 = nn.LeakyReLU()
         self.bn3_1 = nn.BatchNorm2d(32)
-        self.conv3_2 = nn.Conv2d(32, 32, 3, padding=1)
+        self.conv3_2 = nn.Conv2d(32, 32, 5, padding=2)
         self.relu3_2 = nn.LeakyReLU()
         self.bn3_2 = nn.BatchNorm2d(32)
 
         self.conv3_3 = nn.Conv2d(32, self.out_channels, 1, padding=0)
 
         # conv4
-        self.conv4_1 = nn.Conv2d(self.out_channels, 32, 3, padding=1)
+        self.conv4_1 = nn.Conv2d(self.out_channels, 32, 5, padding=2)
         self.relu4_1 = nn.LeakyReLU()
         self.bn4_1 = nn.BatchNorm2d(32)
-        self.conv4_2 = nn.Conv2d(32, 32, 3, padding=1)
+        self.conv4_2 = nn.Conv2d(32, 32, 5, padding=2)
         self.relu4_2 = nn.LeakyReLU()
         self.bn4_2 = nn.BatchNorm2d(32)
-        self.conv4_3 = nn.Conv2d(32, 32, 3, padding=1)
+        self.conv4_3 = nn.Conv2d(32, 32, 5, padding=2)
         self.relu4_3 = nn.LeakyReLU()
         self.bn4_3 = nn.BatchNorm2d(32)
 
         # conv5
-        self.conv5_1 = nn.Conv2d(32, 32, 3, padding=1)
+        self.conv5_1 = nn.Conv2d(32, 32, 5, padding=2)
         self.relu5_1 = nn.LeakyReLU()
         self.bn5_1 = nn.BatchNorm2d(32)
-        self.conv5_2 = nn.Conv2d(32, 32, 3, padding=1)
+        self.conv5_2 = nn.Conv2d(32, 32, 5, padding=2)
         self.relu5_2 = nn.LeakyReLU()
         self.bn5_2 = nn.BatchNorm2d(32)
         self.conv5_3 = nn.Conv2d(32, 32, 3, padding=1)

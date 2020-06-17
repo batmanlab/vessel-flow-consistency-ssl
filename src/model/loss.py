@@ -66,7 +66,7 @@ def resample_from_flow_2d(image, flow):
     xnew, ynew = large2smallgrid(xnew, ynew, image.size())
     # concat them back
     gridnew = xytogrid(xnew, ynew)
-    imagenew = F.grid_sample(image+0, gridnew)
+    imagenew = F.grid_sample(image+0, gridnew, align_corners=True)
     return imagenew
 
 
@@ -86,7 +86,7 @@ def flow_consistency_2d(parent, child):
     # Given new coordinates, convert them and sample the values of children
     xp, yp = large2smallgrid(xp, yp, size)
     newgrid = xytogrid(xp, yp)
-    newchild = F.grid_sample(child, newgrid)
+    newchild = F.grid_sample(child, newgrid, align_corners=True)
     # Given new child values, move as per that direction
     return parent + newchild
 
@@ -109,6 +109,8 @@ def vessel_loss_2d(output, data, config):
     l_decoder = args.get('lambda_decoder')
     l_length = args.get('lambda_length')
 
+    cosineabs = args.get('absolute_cosine', False)
+
     # Get outputs and inputs
     recon = output['recon']
     vessel = output['vessel']
@@ -123,15 +125,23 @@ def vessel_loss_2d(output, data, config):
         v2 = vessel[:, 2:]
         # Intensity consistency loss
         if l_intensity:
-            i_parent = resample_from_flow_2d(image, v1)
-            i_child = resample_from_flow_2d(image, v2)
-            loss = loss + l_intensity * (L_loss(image, i_parent) + L_loss(image, i_child))
+            for scale in [0.2, 0.4, 0.6, 0.8, 1]:
+                i_parent = resample_from_flow_2d(image, scale*v1)
+                i_child = resample_from_flow_2d(image, scale*v2)
+                loss = loss + l_intensity * (L_loss(image, i_parent) + L_loss(image, i_child))/5.0
         # Flow consistency loss
         if l_consistency:
-            loss = loss + l_consistency * L2(flow_consistency_2d(v1, v2))
+            # If v1, v2 are supposed to be opposite directions
+            if not cosineabs:
+                loss = loss + l_consistency * L2(flow_consistency_2d(v1, v2))
+            else:
+                loss = loss + l_consistency * L2(flow_consistency_2d(v1, -v1))
         # Check for cosine similarity
         if l_cosine:
-            loss = loss + l_cosine * (1 + F.cosine_similarity(v1, v2).mean())  # adding 1 so that minimum value of loss is 0
+            if not cosineabs:
+                loss = loss + l_cosine * (1 + F.cosine_similarity(v1, v2).mean())  # adding 1 so that minimum value of loss is 0
+            else:
+                loss = loss + l_cosine * torch.abs(F.cosine_similarity(v1, v2)).mean()
         # Check for decoder
         if l_decoder:
             loss = loss + l_decoder * L2(image, recon)
