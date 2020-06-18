@@ -54,7 +54,7 @@
     "trainer": {
         "epochs": 1000,
         "save_dir": "/pghbio/dbmi/batmanlab/rohit33/saved_models",
-        "save_period": 10,
+        "save_period": 25,
         "verbosity": 2,
         "monitor": "min val_loss",
         "early_stop": 100,

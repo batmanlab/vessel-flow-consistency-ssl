@@ -38,7 +38,8 @@
         "lambda_consistency": 1,
         "lambda_cosine": 1,
         "lambda_decoder": 1,
-        "lambda_length": 1
+        "lambda_length": 1,
+        "absolute_cosine": true
     },
     "metrics": [
         "recon_error_l2"
@@ -53,7 +54,7 @@
     "trainer": {
         "epochs": 1000,
         "save_dir": "/pghbio/dbmi/batmanlab/rohit33/saved_models",
-        "save_period": 5,
+        "save_period": 100,
         "verbosity": 2,
         "monitor": "min val_loss",
         "early_stop": 10,

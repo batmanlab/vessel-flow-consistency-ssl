@@ -37,7 +37,7 @@ class DriveDataset(Dataset):
             idx = idx//8
 
         mask = self.masks[idx]
-        mask = Image.open(mask).resize((256, 256))
+        mask = Image.open(mask).resize((512, 512))
         if flip:
             mask = mask.transpose(Image.FLIP_LEFT_RIGHT)
         mask = mask.rotate(90*rot)
@@ -47,7 +47,7 @@ class DriveDataset(Dataset):
 
         if not self.toy:
             img = self.images[idx]
-            img = Image.open(img).resize((256, 256))
+            img = Image.open(img).resize((512, 512))
             if flip:
                 img = img.transpose(Image.FLIP_LEFT_RIGHT)
             img = img.rotate(90*rot)
