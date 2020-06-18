@@ -3,3 +3,5 @@ rough_notes.pdf
 *.pyc
 *.pdf
 src/tags
+*.job
+*.out

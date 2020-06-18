@@ -1,5 +1,5 @@
 {
-    "name": "drive_vessel",
+    "name": "drive_vessel_toy",
     "n_gpu": 2,
     "arch": {
         "type": "FCN32s",
@@ -17,7 +17,7 @@
             "shuffle": true,
             "validation_split": 0.2,
             "num_workers": 4,
-            "toy": false
+            "toy": true
         }
     },
     "optimizer": {
@@ -54,10 +54,10 @@
     "trainer": {
         "epochs": 1000,
         "save_dir": "/pghbio/dbmi/batmanlab/rohit33/saved_models",
-        "save_period": 100,
+        "save_period": 25,
         "verbosity": 2,
         "monitor": "min val_loss",
-        "early_stop": 10,
+        "early_stop": 100,
         "tensorboard": true
     }
 }
