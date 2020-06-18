@@ -21,9 +21,7 @@
 - [x] DeepVessel https://bit.ly/2zTHDIZ
 - [ ] A retinal vessel detection approach using convolution neural network with reinforcement sample learning strategy https://www.sciencedirect.com/science/article/pii/S0263224118303841
 - [ ] Retinal Image Analysis using Sub-Riemannian Geometry in SE(2)  https://erikbekkers.bitbucket.io/data/Bekkers_EJ_PhD_Thesis.pdf
-
-- [ ] A Deep Learning Design for Improving Topology Coherence in Blood Vessel Segmentation https://link.springer.com/chapter/10.1007/978-3-030-32239-7_11
-
+- [x] A Deep Learning Design for Improving Topology Coherence in Blood Vessel Segmentation https://link.springer.com/chapter/10.1007/978-3-030-32239-7_11
+  - not very useful, just a denoising VAE
 - [ ] Recent advances in directional statistics  https://arxiv.org/abs/2005.06889
-
-- [ ] VE-LLI-VO: Vessel Enhancement Using Local Line Integrals and Variational Optimization https://pubmed.ncbi.nlm.nih.gov/21138806/
+- [x] VE-LLI-VO: Vessel Enhancement Using Local Line Integrals and Variational Optimization https://pubmed.ncbi.nlm.nih.gov/21138806/
