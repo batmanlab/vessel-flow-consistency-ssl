@@ -128,7 +128,15 @@ def vessel_loss_2d(output, data, config):
             for scale in [0.2, 0.4, 0.6, 0.8, 1]:
                 i_parent = resample_from_flow_2d(image, scale*v1)
                 i_child = resample_from_flow_2d(image, scale*v2)
-                loss = loss + l_intensity * (L_loss(image, i_parent) + L_loss(image, i_child))/5.0
+                if cosineabs:
+                    # Check for both directions for same intensity -> this will help in centerline prediction
+                    i_child2 = resample_from_flow_2d(image, -scale*v2)
+                    L_childloss = torch.max(L_loss(image, i_child), L_loss(image, i_child2))
+                    # add parent and child loss
+                else:
+                    L_childloss = L_loss(image, i_child)
+                # Add that loss
+                loss = loss + l_intensity * (L_loss(image, i_parent) + L_childloss)/5.0
         # Flow consistency loss
         if l_consistency:
             # If v1, v2 are supposed to be opposite directions
