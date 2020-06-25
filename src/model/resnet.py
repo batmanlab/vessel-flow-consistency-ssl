@@ -23,7 +23,7 @@ model_urls = {
 def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1):
     """3x3 convolution with padding"""
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
-                     padding=dilation, groups=groups, bias=False, dilation=dilation)
+                     padding=dilation, groups=groups, bias=True, dilation=dilation)
 
 
 def conv3x3up(in_planes, out_planes, stride=1, groups=1, dilation=1):
@@ -31,16 +31,26 @@ def conv3x3up(in_planes, out_planes, stride=1, groups=1, dilation=1):
     if stride > 1:
         ups = nn.Upsample(scale_factor=stride, mode='bilinear', align_corners=True)
         conv = nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=1,
-                         padding=1, groups=1, bias=False, dilation=1)
+                         padding=1, groups=1, bias=True, dilation=1)
         return nn.Sequential(ups, conv)
     else:
         return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
-                         padding=dilation, groups=groups, bias=False, dilation=dilation)
+                         padding=dilation, groups=groups, bias=True, dilation=dilation)
 
 
 def conv1x1(in_planes, out_planes, stride=1):
     """1x1 convolution"""
-    return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, bias=False)
+    return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, bias=True)
+
+
+def shallowup(in_planes, out_planes, scale=2):
+    """ shallow layer for upsampling """
+    layers = []
+    if scale > 1:
+        layers.append(nn.Upsample(scale_factor=scale, mode='bilinear', align_corners=True))
+    layers.append(nn.Conv2d(in_planes, out_planes, kernel_size=3, padding=1))
+    layers.append(nn.BatchNorm2d(out_planes))
+    return nn.Sequential(*layers)
 
 
 class BasicBlock(nn.Module):
@@ -58,7 +68,7 @@ class BasicBlock(nn.Module):
         # Both self.conv1 and self.downsample layers downsample the input when stride != 1
         self.conv1 = conv3x3(inplanes, planes, stride)
         self.bn1 = norm_layer(planes)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.LeakyReLU(inplace=True)
         self.conv2 = conv3x3(planes, planes)
         self.bn2 = norm_layer(planes)
         self.downsample = downsample
@@ -98,7 +108,7 @@ class BasicBlockUp(nn.Module):
         # Both self.conv1 and self.upsample layers upsample the input when stride != 1
         self.conv1 = conv3x3up(inplanes, planes, stride)
         self.bn1 = norm_layer(planes)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.LeakyReLU(inplace=True)
         self.conv2 = conv3x3(planes, planes)
         self.bn2 = norm_layer(planes)
         self.upsample = upsample
@@ -144,7 +154,7 @@ class Bottleneck(nn.Module):
         self.bn2 = norm_layer(width)
         self.conv3 = conv1x1(width, planes * self.expansion)
         self.bn3 = norm_layer(planes * self.expansion)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.LeakyReLU(inplace=True)
         self.downsample = downsample
         self.stride = stride
 
@@ -192,7 +202,7 @@ class BottleneckUp(nn.Module):
         self.bn2 = norm_layer(width)
         self.conv3 = conv1x1(width, planes * self.expansion)
         self.bn3 = norm_layer(planes * self.expansion)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.LeakyReLU(inplace=True)
         self.upsample = upsample
         self.stride = stride
 
@@ -255,31 +265,37 @@ class ResNet(nn.Module):
         self.base_width = width_per_group
 
         # First layer downsamples a lot
-        self.conv1 = nn.Conv2d(self.inp_channels, self.inplanes, kernel_size=7, stride=2, padding=3,
-                               bias=False)
+        self.conv1 = nn.Conv2d(self.inp_channels, self.inplanes, kernel_size=7, stride=1, padding=3,
+                               bias=True)
         self.bn1 = norm_layer(self.inplanes)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.LeakyReLU(inplace=True)
 
         self.layer1 = self._make_layer(block, 32, layers[0])
-        self.layer2 = self._make_layer(block, 64, layers[1], stride=2,
+        self.layer2 = self._make_layer(block, 64, layers[1], stride=1,
                                        dilate=replace_stride_with_dilation[0])
-        self.layer3 = self._make_layer(block, 64, layers[2], stride=2,
+        self.layer3 = self._make_layer(block, 64, layers[2], stride=1,
                                        dilate=replace_stride_with_dilation[1])
-        self.layer4 = self._make_layer(block, 128, layers[3], stride=2,
+        self.layer4 = self._make_layer(block, 128, layers[3], stride=1,
                                        dilate=replace_stride_with_dilation[2])
         # upsampling layers
-        self.uplayer4 = self._make_layer(upblock, 64, layers[3], stride=2,
+        self.uplayer4 = self._make_layer(upblock, 64, layers[3], stride=1,
                 dilate=replace_stride_with_dilation[2])
-        self.uplayer3 = self._make_layer(upblock, 32, layers[2], stride=2,
+        self.uplayer3 = self._make_layer(upblock, 32, layers[2], stride=1,
                 dilate=replace_stride_with_dilation[1])
-        self.uplayer2 = self._make_layer(upblock, 32, layers[1], stride=2,
+        self.uplayer2 = self._make_layer(upblock, 32, layers[1], stride=1,
                 dilate=replace_stride_with_dilation[0])
-        self.uplayer1 = self._make_layer(upblock, 32, layers[0], stride=2,
+        self.uplayer1 = self._make_layer(upblock, 32, layers[0], stride=1,
                 dilate=False)
 
-        self.finalconv = conv1x1(32 * block.expansion, self.out_channels)
+        self.finalconv = conv1x1(32 * block.expansion, self.inp_channels)
         #self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         #self.fc = nn.Linear(512 * block.expansion, num_classes)
+
+        # Shallow layers for vessel outputs
+        self.vlayer1 = shallowup(128, 32, 1)
+        self.vlayer2 = shallowup(32, 16, 1)
+        self.vlayer3 = shallowup(16, 16, 1)
+        self.vlayer4 = conv3x3up(16, self.out_channels, stride=1)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -308,13 +324,11 @@ class ResNet(nn.Module):
             stride = 1
         if stride != 1 or self.inplanes != planes * block.expansion:
             if block in [BasicBlock, Bottleneck]:
-                print('downsample')
                 downsample = nn.Sequential(
                     conv1x1(self.inplanes, planes * block.expansion, stride),
                     norm_layer(planes * block.expansion),
                 )
             else:
-                print('upsample')
                 downsample = nn.Sequential(
                     nn.Upsample(scale_factor=stride, mode='bilinear', align_corners=True),
                     conv1x1(self.inplanes, planes * block.expansion, 1),
@@ -332,8 +346,9 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
 
-    def _forward_impl(self, x):
+    def _forward_impl(self, img):
         # See note [TorchScript super()]
+        x = img['image']
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -343,6 +358,14 @@ class ResNet(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
 
+        # Get vessel layers
+        y = x
+        y = self.relu(self.vlayer1(y))
+        y = self.relu(self.vlayer2(y))
+        y = self.relu(self.vlayer3(y))
+        y = self.vlayer4(y)
+
+       # Upsample image
         x = self.uplayer4(x)
         x = self.uplayer3(x)
         x = self.uplayer2(x)
@@ -350,7 +373,10 @@ class ResNet(nn.Module):
 
         x = self.finalconv(x)
 
-        return x
+        return {
+                'recon': x,
+                'vessel': y,
+        }
 
     def forward(self, x):
         return self._forward_impl(x)

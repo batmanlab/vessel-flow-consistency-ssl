@@ -2,7 +2,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from base import BaseModel
 from model.fcn32s import *
-from model import resnet
+from model.resnet import *
 
 class MnistModel(BaseModel):
     def __init__(self, num_classes=10):
