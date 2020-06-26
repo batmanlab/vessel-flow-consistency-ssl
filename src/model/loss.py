@@ -156,9 +156,9 @@ def vessel_loss_2d(output, data, config):
             loss = loss + l_decoder * L2(image, recon)
         # Check for length of vector
         if l_length:
-            v1norm = (v1**2).sum(1) + eps
-            v2norm = (v2**2).sum(1) + eps
-            loss = loss + l_length * (L2(1./v1norm) + L2(1./v2norm))
+            v1norm = torch.sqrt((v1**2).sum(1) + eps)
+            v2norm = torch.sqrt((v2**2).sum(1) + eps)
+            loss = loss + l_length * (L1(1./v1norm) + L1(1./v2norm))
 
     else:
         raise NotImplementedError
@@ -206,9 +206,9 @@ def vessel_loss_2d_dampen(output, data, config):
         # Intensity consistency loss
         if l_intensity:
             for scale in [0.2, 0.4, 0.6, 0.8, 1]:
+                # Check for both directions for same intensity -> this will help in centerline prediction
                 i_parent = resample_from_flow_2d(image, scale*v1)
                 i_child = resample_from_flow_2d(image, scale*v2)
-                # Check for both directions for same intensity -> this will help in centerline prediction
                 i_child2 = resample_from_flow_2d(image, -scale*v2)
                 L_childloss = torch.max(L_loss(image, i_child), L_loss(image, i_child2))
                 # add parent and child loss
@@ -230,13 +230,13 @@ def vessel_loss_2d_dampen(output, data, config):
 
         # Check for length of vector
         if l_length:
-            v1norm = (v1**2).sum(1) + eps
-            loss = loss + l_length * L2(1./v1norm)
+            v1norm = torch.sqrt((v1**2).sum(1) + eps)
+            loss = loss + l_length * L1(1./v1norm)
 
         # Check for length of vector for perpendicular line
         if l_perlength:
             v2norm = torch.sqrt((v2**2).sum(1) + eps)
-            loss = loss + l_perlength * L2(v2norm)
+            loss = loss + l_perlength * L1(v2norm)
 
         # Check profile by taking convolution with the template [-1 -1 1 1 1 1 -1 -1]
         if l_template:
