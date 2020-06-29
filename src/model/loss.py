@@ -247,7 +247,7 @@ def vessel_loss_2d_dampen(output, data, config):
                 # Compute the convolution I * f
                 loss_conv = loss_conv + i_val * filt
             # take absolute value of that correlation
-            loss = loss + l_template * torch.abs(loss_conv).mean() / num_samples_template
+            loss = loss + l_template * (1 - torch.abs(loss_conv).mean()/num_samples_template)
 
     else:
         raise NotImplementedError
