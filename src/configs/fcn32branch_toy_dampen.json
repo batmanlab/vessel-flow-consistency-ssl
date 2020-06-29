@@ -40,8 +40,8 @@
         "lambda_decoder": 1,
         "lambda_length": 1,
         "lambda_template": 1,
-        "num_samples_template": 10,
-        "lambda_perlength": 0.025
+        "num_samples_template": 20,
+        "lambda_perlength": 0.5
     },
     "metrics": [
         "recon_error_l2"
