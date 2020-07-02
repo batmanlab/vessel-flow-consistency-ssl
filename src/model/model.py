@@ -4,6 +4,7 @@ from base import BaseModel
 from model.fcn32s import *
 from model.resnet import *
 from model.deepnets import *
+from model.unet import *
 
 class MnistModel(BaseModel):
     def __init__(self, num_classes=10):

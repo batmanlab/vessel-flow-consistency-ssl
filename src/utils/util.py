@@ -5,7 +5,11 @@ from itertools import repeat
 from collections import OrderedDict
 import torch
 from numpy import pi
+import numpy as np
+from matplotlib import pyplot as plt
 from skimage.color import hsv2rgb
+from skimage import color
+from model.loss import resample_from_flow_2d
 
 def ensure_dir(dirname):
     dirname = Path(dirname)
@@ -78,3 +82,40 @@ def dir2flow_2d(flow, ret_mag=False):
             rgb_i = hsv2rgb(hsv_i)
             rgb[i] = torch.FloatTensor(rgb_i)
         return rgb.permute(0, 3, 1, 2)
+
+
+# Output vesselness
+def v2vesselness(image, ves, nsample=20):
+    response = 0.0
+    for s in np.linspace(-2, 2, nsample):
+        filt = 2*int(abs(s) < 1) - 1
+        i_val = resample_from_flow_2d(image, s*ves)
+        # Compute the convolution I * f
+        response = response + i_val * filt
+    return response
+
+# Give an image and overlay
+def overlay(image, ves, alpha=0.4):
+    # Given images of size [B, 1, H, W] and vesselness [B, 1, H, W]
+    B, C, H, W = ves.shape
+    img = (image - image.min())/(image.max() - image.min())
+    # Init colormap image
+    cimg = torch.FloatTensor(np.zeros((B, 3, H, W)))
+    cimg_converter = plt.get_cmap('jet')
+    for i in range(B):
+        v = np.abs(ves[i, 0].detach().numpy())
+        cv = cimg_converter(v)[:, :, :-1]       # 3
+        ci = img[i, 0].detach().numpy()         # 1
+        # Given cv of size [H, W, 3] and [H, W, 1]
+        hsv_vessel = color.rgb2hsv(cv)
+        hsv_img = color.rgb2hsv(color.gray2rgb(ci))
+        # replace hsv of img with hsv of vessel
+        hsv_img[..., 0] = hsv_vessel[..., 0]
+        hsv_img[..., 1] = hsv_vessel[..., 1] * alpha
+        f_img = color.hsv2rgb(hsv_img)
+
+        cimg[i] = torch.FloatTensor(f_img.transpose(2, 0, 1))
+    # img is in [0, 1]  --> [B, 1, H, W]
+    # cimg is in [0, 1] --> [B, 3, H, W]
+    return cimg
+

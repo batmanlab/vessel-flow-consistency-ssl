@@ -3,7 +3,7 @@ import torch
 from torchvision.utils import make_grid
 from base import BaseTrainer
 from utils import inf_loop, MetricTracker
-from utils import dir2flow_2d
+from utils import dir2flow_2d, v2vesselness, overlay
 
 class VesselTrainer(BaseTrainer):
     """
@@ -77,6 +77,10 @@ class VesselTrainer(BaseTrainer):
                 self.writer.add_image('v_y', make_grid(output['vessel'][:, 1:2].cpu(), nrow=4, normalize=True))
                 self.writer.add_image('flow', make_grid(dir2flow_2d(output['vessel'][:, 0:2].cpu()), nrow=4, normalize=True))
                 self.writer.add_image('flow_rev', make_grid(dir2flow_2d(output['vessel'][:, 2:4].cpu(), True), nrow=4, normalize=True))
+                #self.writer.add_image('v2_vesselness', make_grid(v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu()), nrow=4, normalize=True))
+                ves = v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu())
+                overlay_img = overlay(data['image'].cpu(), ves)
+                self.writer.add_image('v2_vesselness', make_grid(overlay_img, nrow=4, normalize=True))
                 #print(output['vessel'].max(), output['vessel'].min())
 
             if batch_idx == self.len_epoch:
@@ -117,6 +121,10 @@ class VesselTrainer(BaseTrainer):
                 self.writer.add_image('v_y', make_grid(output['vessel'][:, 1:2].cpu(), nrow=4, normalize=True))
                 self.writer.add_image('flow', make_grid(dir2flow_2d(output['vessel'][:, 0:2].cpu()), nrow=4, normalize=True))
                 self.writer.add_image('flow_rev', make_grid(dir2flow_2d(output['vessel'][:, 2:4].cpu(), True), nrow=4, normalize=True))
+                #self.writer.add_image('v2_vesselness', make_grid(v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu()), nrow=4, normalize=True))
+                ves = v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu())
+                overlay_img = overlay(data['image'].cpu(), ves)
+                self.writer.add_image('v2_vesselness', make_grid(overlay_img, nrow=4, normalize=True))
 
         # add histogram of model parameters to the tensorboard
         for name, p in self.model.named_parameters():
