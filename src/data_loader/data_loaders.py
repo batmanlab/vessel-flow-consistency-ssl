@@ -31,9 +31,9 @@ class ToyStrLineLoader(BaseDataLoader):
     '''
     Dataloader for straight lines
     '''
-    def __init__(self, img_size, batch_size, shuffle=True, validation_split=0.0, num_workers=1, training=True ):
+    def __init__(self, img_size, batch_size, shuffle=True, validation_split=0.0, num_workers=1, training=True, holesize=0):
         self.img_size = img_size
-        self.dataset = ToyStrLines(self.img_size, train=training)
+        self.dataset = ToyStrLines(self.img_size, train=training, holesize=holesize)
         super().__init__(self.dataset, batch_size, shuffle, validation_split, num_workers)
 
 

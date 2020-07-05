@@ -152,7 +152,7 @@ def overlay(image, ves, alpha=0.4):
     randstr = np.random.choice(ALPHABET, size=20)
     for i in range(B):
         v = np.abs(ves[i, 0].detach().numpy()) + 0
-        v = (v - v.min()) / (v.max() - v.min())
+        v = (v - v.min()) / (v.max() - v.min() + 1e-10)
         cv = cimg_converter(v)[:, :, :-1]       # 3
         ci = img[i, 0].detach().numpy()         # 1
         # Given cv of size [H, W, 3] and [H, W, 1]

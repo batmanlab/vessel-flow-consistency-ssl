@@ -8,8 +8,9 @@ from PIL import Image
 
 class ToyStrLines(Dataset):
 
-    def __init__(self, img_size, train=True):
+    def __init__(self, img_size, train=True, holesize=0):
         self.img_size = img_size
+        self.holesize = holesize
 
 
     def __len__(self):
@@ -42,6 +43,12 @@ class ToyStrLines(Dataset):
         # Get distance of each point from
         dist = np.abs(sint*xx - cost*yy)
         vessel = (dist < vessel_thickness//2).astype(int)
+        # Add the hole
+        if self.holesize > 0:
+            holemask = np.abs(cost*xx + sint*yy)
+            holemask = (holemask < self.holesize//2)
+            y, x = np.where(holemask)
+            vessel[y, x] = 0
         return vessel
 
 
