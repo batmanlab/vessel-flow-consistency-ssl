@@ -1,0 +1,65 @@
+{
+    "name": "curvedlines_unet_dampen",
+    "n_gpu": 2,
+    "arch": {
+        "type": "UNet",
+        "args": {
+            "inp_channels": 1,
+            "out_channels": 4
+        }
+    },
+    "log_dir": "/pghbio/dbmi/batmanlab/rohit33/saved_models",
+    "data_loader": {
+        "type": "ToyCurvedLineLoader",
+        "args": {
+            "img_size": 64,
+            "batch_size": 64,
+            "shuffle": true,
+            "validation_split": 0.2,
+            "num_workers": 4
+        }
+    },
+    "optimizer": {
+        "type": "Adam",
+        "args":{
+            "lr": 0.001,
+            "weight_decay": 0,
+            "amsgrad": true
+        }
+    },
+    "loss": "vessel_loss_2d_dampen",
+    "loss_args": {
+        "num_directions": 2,
+        "eps": 1e-1,
+        "uncertainty": false,
+        "loss_intensity": "L2",
+        "lambda_intensity": 3,
+        "lambda_consistency": 1,
+        "lambda_cosine": 1,
+        "lambda_decoder": 1,
+        "lambda_length": 1,
+        "lambda_template": 1,
+        "num_samples_template": 20,
+        "lambda_perlength": 0
+    },
+    "metrics": [
+        "recon_error_l2"
+    ],
+    "lr_scheduler": {
+        "type": "StepLR",
+        "args": {
+            "step_size": 50,
+            "gamma": 1
+        }
+    },
+    "trainer": {
+        "epochs": 1000,
+        "save_dir": "/pghbio/dbmi/batmanlab/rohit33/saved_models",
+        "save_period": 25,
+        "verbosity": 2,
+        "monitor": "min val_loss",
+        "early_stop": 100,
+        "img_log_step": 4,
+        "tensorboard": true
+    }
+}
