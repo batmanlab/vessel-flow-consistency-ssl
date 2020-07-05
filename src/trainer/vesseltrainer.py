@@ -3,7 +3,7 @@ import torch
 from torchvision.utils import make_grid
 from base import BaseTrainer
 from utils import inf_loop, MetricTracker
-from utils import dir2flow_2d, v2vesselness, overlay
+from utils import dir2flow_2d, v2vesselness, overlay, overlay_quiver
 
 class VesselTrainer(BaseTrainer):
     """
@@ -32,6 +32,7 @@ class VesselTrainer(BaseTrainer):
         self.do_validation = self.valid_data_loader is not None
         self.lr_scheduler = lr_scheduler
         self.log_step = int(np.sqrt(data_loader.batch_size))
+        self.img_log_step = config['trainer'].get('img_log_step', 1)
 
         self.train_metrics = MetricTracker('loss', *[m.__name__ for m in self.metric_ftns], writer=self.writer)
         self.valid_metrics = MetricTracker('loss', *[m.__name__ for m in self.metric_ftns], writer=self.writer)
@@ -71,16 +72,21 @@ class VesselTrainer(BaseTrainer):
                     epoch,
                     self._progress(batch_idx),
                     loss.item()))
+
+            # Every few steps, add some images
+            if epoch % self.img_log_step == 0 and batch_idx == 0:
                 self.writer.add_image('input', make_grid(0.5 + 0.5*data['image'].cpu(), nrow=4, normalize=True))
                 self.writer.add_image('recon', make_grid(0.5 + 0.5*output['recon'].cpu(), nrow=4, normalize=True))
                 self.writer.add_image('v_x', make_grid(output['vessel'][:, 0:1].cpu(), nrow=4, normalize=True))
                 self.writer.add_image('v_y', make_grid(output['vessel'][:, 1:2].cpu(), nrow=4, normalize=True))
-                self.writer.add_image('flow', make_grid(dir2flow_2d(output['vessel'][:, 0:2].cpu()), nrow=4, normalize=True))
-                self.writer.add_image('flow_rev', make_grid(dir2flow_2d(output['vessel'][:, 2:4].cpu(), True), nrow=4, normalize=True))
-                #self.writer.add_image('v2_vesselness', make_grid(v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu()), nrow=4, normalize=True))
+                #self.writer.add_image('flow', make_grid(dir2flow_2d(output['vessel'][:, 0:2].cpu()), nrow=4, normalize=True))
+                #self.writer.add_image('flow_rev', make_grid(dir2flow_2d(output['vessel'][:, 2:4].cpu(), ret_mag=True), nrow=4, normalize=True))
+                self.writer.add_image('flow', make_grid(overlay_quiver(data['image'].cpu(), output['vessel'][:, 0:2].cpu()), nrow=4, normalize=True))
+                self.writer.add_image('flow_rev', make_grid(overlay_quiver(data['image'].cpu(), output['vessel'][:, 2:4].cpu()), nrow=4, normalize=True))
+                self.writer.add_image('v2_vesselness_only', make_grid(v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu()), nrow=4, normalize=True))
                 ves = v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu())
                 overlay_img = overlay(data['image'].cpu(), ves)
-                self.writer.add_image('v2_vesselness', make_grid(overlay_img, nrow=4, normalize=True))
+                self.writer.add_image('v2_vesselness_overlay', make_grid(overlay_img, nrow=4, normalize=True))
                 #print(output['vessel'].max(), output['vessel'].min())
 
             if batch_idx == self.len_epoch:
@@ -115,16 +121,20 @@ class VesselTrainer(BaseTrainer):
                 self.valid_metrics.update('loss', loss.item())
                 for met in self.metric_ftns:
                     self.valid_metrics.update(met.__name__, met(output, data))
-                self.writer.add_image('input', make_grid(0.5 + 0.5*data['image'].cpu(), nrow=4, normalize=True))
-                self.writer.add_image('recon', make_grid(0.5 + 0.5*output['recon'].cpu(), nrow=4, normalize=True))
-                self.writer.add_image('v_x', make_grid(output['vessel'][:, 0:1].cpu(), nrow=4, normalize=True))
-                self.writer.add_image('v_y', make_grid(output['vessel'][:, 1:2].cpu(), nrow=4, normalize=True))
-                self.writer.add_image('flow', make_grid(dir2flow_2d(output['vessel'][:, 0:2].cpu()), nrow=4, normalize=True))
-                self.writer.add_image('flow_rev', make_grid(dir2flow_2d(output['vessel'][:, 2:4].cpu(), True), nrow=4, normalize=True))
-                #self.writer.add_image('v2_vesselness', make_grid(v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu()), nrow=4, normalize=True))
-                ves = v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu())
-                overlay_img = overlay(data['image'].cpu(), ves)
-                self.writer.add_image('v2_vesselness', make_grid(overlay_img, nrow=4, normalize=True))
+
+                if epoch % self.img_log_step == 0 and batch_idx == 0:
+                    self.writer.add_image('input', make_grid(0.5 + 0.5*data['image'].cpu(), nrow=4, normalize=True))
+                    self.writer.add_image('recon', make_grid(0.5 + 0.5*output['recon'].cpu(), nrow=4, normalize=True))
+                    self.writer.add_image('v_x', make_grid(output['vessel'][:, 0:1].cpu(), nrow=4, normalize=True))
+                    self.writer.add_image('v_y', make_grid(output['vessel'][:, 1:2].cpu(), nrow=4, normalize=True))
+                    #self.writer.add_image('flow', make_grid(dir2flow_2d(output['vessel'][:, 0:2].cpu()), nrow=4, normalize=True))
+                    #self.writer.add_image('flow_rev', make_grid(dir2flow_2d(output['vessel'][:, 2:4].cpu(), ret_mag=True), nrow=4, normalize=True))
+                    self.writer.add_image('flow', make_grid(overlay_quiver(data['image'].cpu(), output['vessel'][:, 0:2].cpu()), nrow=4, normalize=True))
+                    self.writer.add_image('flow_rev', make_grid(overlay_quiver(data['image'].cpu(), output['vessel'][:, 2:4].cpu()), nrow=4, normalize=True))
+                    self.writer.add_image('v2_vesselness_only', make_grid(v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu()), nrow=4, normalize=True))
+                    ves = v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu())
+                    overlay_img = overlay(data['image'].cpu(), ves)
+                    self.writer.add_image('v2_vesselness_overlay', make_grid(overlay_img, nrow=4, normalize=True))
 
         # add histogram of model parameters to the tensorboard
         for name, p in self.model.named_parameters():

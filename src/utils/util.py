@@ -1,4 +1,5 @@
 import json
+import os
 import pandas as pd
 from pathlib import Path
 from itertools import repeat
@@ -7,9 +8,13 @@ import torch
 from numpy import pi
 import numpy as np
 from matplotlib import pyplot as plt
+from PIL import Image
 from skimage.color import hsv2rgb
 from skimage import color
 from model.loss import resample_from_flow_2d
+import string
+
+ALPHABET = np.array(list(string.ascii_lowercase + ' '))
 
 def ensure_dir(dirname):
     dirname = Path(dirname)
@@ -55,6 +60,47 @@ class MetricTracker:
         return dict(self._data.average)
 
 
+# overlay a quiver
+def overlay_quiver(img, flow, scale=2):
+    # Given image of size [B, 1, H, W] and flow of size [B, 2, H, W]
+    # output a quiver plot
+    B, _, H, W = img.shape
+    vx = flow[:, 0].data.cpu().numpy()
+    vy = flow[:, 1].data.cpu().numpy()
+    norm = np.sqrt(vx**2 + vy**2 + 1e-20)
+    vx = vx / norm
+    vy = vy / norm
+
+    x = np.arange(W)
+    y = np.arange(H)
+    xx, yy = np.meshgrid(x, y)
+    xx = xx[::scale, ::scale]
+    yy = yy[::scale, ::scale]
+    # For each image, add quiver plot
+    images = []
+    randstr = np.random.choice(ALPHABET, size=20)
+    for i in range(B):
+        _img = (img[i, 0].data.cpu().numpy())
+        _vx = (vx[i])[::scale, ::scale]
+        _vy = (-vy[i])[::scale, ::scale]
+        if not plt.fignum_exists(1234):
+            plt.figure(figsize=(16, 16), num=1234)
+        plt.clf()
+        plt.imshow(_img, 'gray')
+        plt.quiver(xx, yy, _vx, _vy, color='lightgreen')
+        plt.axis('off')
+        plt.savefig('_overlay_quiver_{}.png'.format(randstr), bbox_inches='tight')
+        # load it back from file
+        _tmpimg = Image.open('_overlay_quiver_{}.png'.format(randstr))
+        _tmpimg = (np.array(_tmpimg)[:,:,:3]).transpose(2, 0, 1)[None]
+        images.append(_tmpimg)
+    # images
+    os.remove("_overlay_quiver_{}.png".format(randstr))
+    images = np.concatenate(images, 0)
+    images = torch.FloatTensor(images)
+    return images
+
+
 # Other functions for vessels
 def dir2flow_2d(flow, ret_mag=False):
     ''' Given a [B, 2, H, W] flow vector, convert into hsv and then to rgb '''
@@ -94,27 +140,47 @@ def v2vesselness(image, ves, nsample=20):
         response = response + i_val * filt
     return response
 
-# Give an image and overlay
+# Give an image and vessel overlay
 def overlay(image, ves, alpha=0.4):
     # Given images of size [B, 1, H, W] and vesselness [B, 1, H, W]
     B, C, H, W = ves.shape
     img = (image - image.min())/(image.max() - image.min())
     # Init colormap image
-    cimg = torch.FloatTensor(np.zeros((B, 3, H, W)))
+    #cimg = torch.FloatTensor(np.zeros((B, 3, H, W)))
+    cimg = []
     cimg_converter = plt.get_cmap('jet')
+    randstr = np.random.choice(ALPHABET, size=20)
     for i in range(B):
-        v = np.abs(ves[i, 0].detach().numpy())
+        v = np.abs(ves[i, 0].detach().numpy()) + 0
+        v = (v - v.min()) / (v.max() - v.min())
         cv = cimg_converter(v)[:, :, :-1]       # 3
         ci = img[i, 0].detach().numpy()         # 1
         # Given cv of size [H, W, 3] and [H, W, 1]
+        #f_img = (1-alpha)*ci[..., None] + alpha*cv
+        #f_img = ci[..., None] * cv
+        if not plt.fignum_exists(1234):
+            plt.figure(figsize=(16, 16), num=1234)
+        plt.clf()
+        plt.imshow(ci, 'gray')
+        plt.imshow(cv, alpha=alpha)
+        plt.axis('off')
+        plt.savefig("_overlay_{}.png".format(randstr), bbox_inches='tight')
+        _tmpimg = Image.open('_overlay_{}.png'.format(randstr))
+        _tmpimg = (np.array(_tmpimg)[:,:,:3]).transpose(2, 0, 1)[None]
+        cimg.append(_tmpimg)
+
+        '''
         hsv_vessel = color.rgb2hsv(cv)
         hsv_img = color.rgb2hsv(color.gray2rgb(ci))
         # replace hsv of img with hsv of vessel
         hsv_img[..., 0] = hsv_vessel[..., 0]
         hsv_img[..., 1] = hsv_vessel[..., 1] * alpha
         f_img = color.hsv2rgb(hsv_img)
-
-        cimg[i] = torch.FloatTensor(f_img.transpose(2, 0, 1))
+        '''
+        #cimg[i] = torch.FloatTensor(f_img.transpose(2, 0, 1))
+    os.remove("_overlay_{}.png".format(randstr))
+    cimg = np.concatenate(cimg, 0)
+    cimg = torch.FloatTensor(cimg)
     # img is in [0, 1]  --> [B, 1, H, W]
     # cimg is in [0, 1] --> [B, 3, H, W]
     return cimg

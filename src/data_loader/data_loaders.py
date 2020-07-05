@@ -1,6 +1,6 @@
 from torchvision import datasets, transforms
 from base import BaseDataLoader
-from data_loader.datasets import DriveDataset, ToyStrLines
+from data_loader.datasets import DriveDataset, ToyStrLines, ToySlantLines
 
 
 class MnistDataLoader(BaseDataLoader):
@@ -34,5 +34,15 @@ class ToyStrLineLoader(BaseDataLoader):
     def __init__(self, img_size, batch_size, shuffle=True, validation_split=0.0, num_workers=1, training=True ):
         self.img_size = img_size
         self.dataset = ToyStrLines(self.img_size, train=training)
+        super().__init__(self.dataset, batch_size, shuffle, validation_split, num_workers)
+
+
+class ToySlantLineLoader(BaseDataLoader):
+    '''
+    Dataloader for DRIVE dataset
+    '''
+    def __init__(self, img_size, batch_size, shuffle=True, validation_split=0.0, num_workers=1, training=True ):
+        self.img_size = img_size
+        self.dataset = ToySlantLines(self.img_size, train=training)
         super().__init__(self.dataset, batch_size, shuffle, validation_split, num_workers)
 
