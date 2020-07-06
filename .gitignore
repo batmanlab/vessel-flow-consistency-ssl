@@ -3,5 +3,6 @@ rough_notes.pdf
 *.pyc
 *.pdf
 src/tags
+todo.md
 *.job
 *.out
