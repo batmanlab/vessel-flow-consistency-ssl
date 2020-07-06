@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+import numpy as np
 
 def nll_loss(output, target):
     return F.nll_loss(output, target)
@@ -155,12 +156,103 @@ def vessel_loss_2d(output, data, config):
             loss = loss + l_decoder * L2(image, recon)
         # Check for length of vector
         if l_length:
-            v1norm = (v1**2).sum(1) + eps
-            v2norm = (v2**2).sum(1) + eps
-            loss = loss + l_length * (L2(1./v1norm) + L2(1./v2norm))
+            v1norm = torch.sqrt((v1**2).sum(1) + eps)
+            v2norm = torch.sqrt((v2**2).sum(1) + eps)
+            loss = loss + l_length * (L1(1./v1norm) + L1(1./v2norm))
 
     else:
         raise NotImplementedError
 
     # Return loss
     return loss
+
+
+
+
+def vessel_loss_2d_dampen(output, data, config):
+    '''
+    Master loss function of vessel self supervised learning
+    '''
+    args = config['loss_args']
+    # Get all parameters
+    num_dir = args['num_directions'] # Determine the directions
+    unc = args['uncertainty'] # whether to use kappa uncertainty
+    eps = args['eps']
+    L_loss = LOSS_FNs[args['loss_intensity']]
+    # Weights for different parts of total loss
+    l_intensity = args.get('lambda_intensity')
+    l_consistency = args.get('lambda_consistency')
+    l_cosine = args.get('lambda_cosine')
+    l_decoder = args.get('lambda_decoder')
+    l_length = args.get('lambda_length')
+
+    # Add extra parameters -> length and matching of template profile
+    l_template = args.get('lambda_template')
+    num_samples_template = args.get('num_samples_template', 10)
+    l_perlength = args.get('lambda_perlength')
+
+    # Get outputs and inputs
+    recon = output['recon']
+    vessel = output['vessel']
+    image = data['image']
+
+    # Now use the losses given in the config
+    if num_dir == 2 and not unc:
+        assert config['arch']['args']['out_channels'] == 4, 'Model with 2 directions and no uncertainty'
+        # parameters are v1, v2
+        loss = 0.0
+        v1 = vessel[:, :2]
+        v2 = vessel[:, 2:]
+        # Intensity consistency loss
+        if l_intensity:
+            for scale in [0.2, 0.4, 0.6, 0.8, 1]:
+                # Check for both directions for same intensity -> this will help in centerline prediction
+                i_parent = resample_from_flow_2d(image, scale*v1)
+                i_child = resample_from_flow_2d(image, scale*v2)
+                i_child2 = resample_from_flow_2d(image, -scale*v2)
+                L_childloss = torch.max(L_loss(image, i_child), L_loss(image, i_child2))
+                # add parent and child loss
+                # Add that loss
+                loss = loss + l_intensity * (L_loss(image, i_parent) + L_childloss)/5.0
+
+        # Flow consistency loss
+        if l_consistency:
+            # If v1, v2 are supposed to be opposite directions
+            loss = loss + l_consistency * L2(flow_consistency_2d(v1, -v1))
+
+        # Check for cosine similarity
+        if l_cosine:
+            loss = loss + l_cosine * torch.abs(F.cosine_similarity(v1, v2)).mean()
+
+        # Check for decoder
+        if l_decoder:
+            loss = loss + l_decoder * L2(image, recon)
+
+        # Check for length of vector
+        if l_length:
+            v1norm = torch.sqrt((v1**2).sum(1) + eps)
+            loss = loss + l_length * L1(1./v1norm)
+
+        # Check for length of vector for perpendicular line
+        if l_perlength:
+            v2norm = torch.sqrt((v2**2).sum(1) + eps)
+            loss = loss + l_perlength * L1(v2norm)
+
+        # Check profile by taking convolution with the template [-1 -1 1 1 1 1 -1 -1]
+        if l_template:
+            loss_conv = 0.0
+            for s in np.linspace(-2, 2, num_samples_template):
+                filt = 2*int(abs(s) < 1) - 1
+                i_val = resample_from_flow_2d(image, s*v2)
+                # Compute the convolution I * f
+                loss_conv = loss_conv + i_val * filt
+            # take absolute value of that correlation
+            loss = loss + l_template * (1 - loss_conv.mean()/num_samples_template)
+
+    else:
+        raise NotImplementedError
+
+    # Return loss
+    return loss
+
+

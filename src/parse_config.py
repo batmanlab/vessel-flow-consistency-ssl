@@ -1,6 +1,7 @@
 import os
 import logging
 from pathlib import Path
+import shutil
 from functools import reduce, partial
 from operator import getitem
 from datetime import datetime
@@ -26,13 +27,18 @@ class ConfigParser:
         save_dir = Path(self.config['trainer']['save_dir'])
 
         exper_name = self.config['name']
-        if run_id is None: # use timestamp as default run-id
+        if run_id is None or run_id == "": # use timestamp as default run-id
             run_id = datetime.now().strftime(r'%m%d_%H%M%S')
         self._save_dir = save_dir / 'models' / exper_name / run_id
         self._log_dir = save_dir / 'log' / exper_name / run_id
 
         # make directory for saving checkpoints and log.
         exist_ok = run_id == ''
+        if self.save_dir.exists():
+            shutil.rmtree(self.save_dir)
+        if self.log_dir.exists():
+            shutil.rmtree(self.log_dir)
+
         self.save_dir.mkdir(parents=True, exist_ok=exist_ok)
         self.log_dir.mkdir(parents=True, exist_ok=exist_ok)
 
