@@ -8,6 +8,7 @@
             "out_channels": 4
         }
     },
+    "vessel_type": "dark",
     "log_dir": "/pghbio/dbmi/batmanlab/rohit33/saved_models",
     "data_loader": {
         "type": "ToyStrLineLoader",

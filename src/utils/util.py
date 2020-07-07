@@ -14,7 +14,7 @@ from skimage import color
 from model.loss import resample_from_flow_2d
 import string
 
-ALPHABET = np.array(list(string.ascii_lowercase + ' '))
+ALPHABET = np.array(list(string.ascii_lowercase))
 
 def ensure_dir(dirname):
     dirname = Path(dirname)
