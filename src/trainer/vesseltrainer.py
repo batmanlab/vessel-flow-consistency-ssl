@@ -51,6 +51,12 @@ class VesselTrainer(BaseTrainer):
         :param epoch: Integer, current training epoch.
         :return: A log that contains average loss and metric in this epoch.
         """
+        # Get parameters for quiver
+        params = self.config['trainer']
+        normflow = params.get('normalize_flow', True)
+        normflowrev = params.get('normalize_flow_rev', True)
+        quiverscale = params.get('quiver_scale', 2)
+
         self.model.train()
         self.train_metrics.reset()
         for batch_idx, data in enumerate(self.data_loader):
@@ -73,6 +79,9 @@ class VesselTrainer(BaseTrainer):
                     self._progress(batch_idx),
                     loss.item()))
 
+            # Get vessel type here
+            vessel_type = self.config.get('vessel_type', 'light')
+
             # Every few steps, add some images
             if epoch % self.img_log_step == 0 and batch_idx == 0:
                 self.writer.add_image('input', make_grid(0.5 + 0.5*data['image'].cpu(), nrow=4, normalize=True))
@@ -81,10 +90,10 @@ class VesselTrainer(BaseTrainer):
                 self.writer.add_image('v_y', make_grid(output['vessel'][:, 1:2].cpu(), nrow=4, normalize=True))
                 #self.writer.add_image('flow', make_grid(dir2flow_2d(output['vessel'][:, 0:2].cpu()), nrow=4, normalize=True))
                 #self.writer.add_image('flow_rev', make_grid(dir2flow_2d(output['vessel'][:, 2:4].cpu(), ret_mag=True), nrow=4, normalize=True))
-                self.writer.add_image('flow', make_grid(overlay_quiver(data['image'].cpu(), output['vessel'][:, 0:2].cpu()), nrow=4, normalize=True))
-                self.writer.add_image('flow_rev', make_grid(overlay_quiver(data['image'].cpu(), output['vessel'][:, 2:4].cpu()), nrow=4, normalize=True))
-                self.writer.add_image('v2_vesselness_only', make_grid(v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu()), nrow=4, normalize=True))
-                ves = v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu())
+                self.writer.add_image('flow', make_grid(overlay_quiver(data['image'].cpu(), output['vessel'][:, 0:2].cpu(), quiverscale, normflow), nrow=4, normalize=True))
+                self.writer.add_image('flow_rev', make_grid(overlay_quiver(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), quiverscale, normflowrev), nrow=4, normalize=True))
+                self.writer.add_image('v2_vesselness_only', make_grid(v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type), nrow=4, normalize=True))
+                ves = v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type)
                 overlay_img = overlay(data['image'].cpu(), ves)
                 self.writer.add_image('v2_vesselness_overlay', make_grid(overlay_img, nrow=4, normalize=True))
                 #print(output['vessel'].max(), output['vessel'].min())
@@ -108,6 +117,15 @@ class VesselTrainer(BaseTrainer):
         :param epoch: Integer, current training epoch.
         :return: A log that contains information about validation
         """
+        # Get quiver params
+        params = self.config['trainer']
+        normflow = params.get('normalize_flow', True)
+        normflowrev = params.get('normalize_flow_rev', True)
+        quiverscale = params.get('quiver_scale', 2)
+
+        # Get vessel type here
+        vessel_type = self.config.get('vessel_type', 'light')
+
         self.model.eval()
         self.valid_metrics.reset()
         with torch.no_grad():
@@ -129,10 +147,10 @@ class VesselTrainer(BaseTrainer):
                     self.writer.add_image('v_y', make_grid(output['vessel'][:, 1:2].cpu(), nrow=4, normalize=True))
                     #self.writer.add_image('flow', make_grid(dir2flow_2d(output['vessel'][:, 0:2].cpu()), nrow=4, normalize=True))
                     #self.writer.add_image('flow_rev', make_grid(dir2flow_2d(output['vessel'][:, 2:4].cpu(), ret_mag=True), nrow=4, normalize=True))
-                    self.writer.add_image('flow', make_grid(overlay_quiver(data['image'].cpu(), output['vessel'][:, 0:2].cpu()), nrow=4, normalize=True))
-                    self.writer.add_image('flow_rev', make_grid(overlay_quiver(data['image'].cpu(), output['vessel'][:, 2:4].cpu()), nrow=4, normalize=True))
-                    self.writer.add_image('v2_vesselness_only', make_grid(v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu()), nrow=4, normalize=True))
-                    ves = v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu())
+                    self.writer.add_image('flow', make_grid(overlay_quiver(data['image'].cpu(), output['vessel'][:, 0:2].cpu(), quiverscale, normflow), nrow=4, normalize=True))
+                    self.writer.add_image('flow_rev', make_grid(overlay_quiver(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), quiverscale, normflowrev), nrow=4, normalize=True))
+                    self.writer.add_image('v2_vesselness_only', make_grid(v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type), nrow=4, normalize=True))
+                    ves = v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type)
                     overlay_img = overlay(data['image'].cpu(), ves)
                     self.writer.add_image('v2_vesselness_overlay', make_grid(overlay_img, nrow=4, normalize=True))
 

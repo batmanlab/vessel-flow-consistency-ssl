@@ -61,24 +61,33 @@ class MetricTracker:
 
 
 # overlay a quiver
-def overlay_quiver(img, flow, scale=2):
+def overlay_quiver(Img, flow, scale=2, normalize=True):
     # Given image of size [B, 1, H, W] and flow of size [B, 2, H, W]
     # output a quiver plot
-    B, _, H, W = img.shape
-    vx = flow[:, 0].data.cpu().numpy()
-    vy = flow[:, 1].data.cpu().numpy()
-    norm = np.sqrt(vx**2 + vy**2 + 1e-20)
-    vx = vx / norm
-    vy = vy / norm
+    B, _, H, W = Img.shape
+    hmin = np.random.randint(H-64+1)
+    hmax = hmin + 64
+    wmin = np.random.randint(W-64+1)
+    wmax = wmin + 64
+    # Crop image
+    img = Img[:, :, hmin:hmax, wmin:wmax]
+    vx = flow[:, 0, hmin:hmax, wmin:wmax].data.cpu().numpy()
+    vy = flow[:, 1, hmin:hmax, wmin:wmax].data.cpu().numpy()
+    if normalize:
+        norm = np.sqrt(vx**2 + vy**2 + 1e-20)
+        vx = vx / norm
+        vy = vy / norm
 
-    x = np.arange(W)
-    y = np.arange(H)
+    x = np.arange(64)
+    y = np.arange(64)
     xx, yy = np.meshgrid(x, y)
     xx = xx[::scale, ::scale]
     yy = yy[::scale, ::scale]
+
     # For each image, add quiver plot
     images = []
     randstr = np.random.choice(ALPHABET, size=20)
+    randstr = "".join(list(randstr))
     for i in range(B):
         _img = (img[i, 0].data.cpu().numpy())
         _vx = (vx[i])[::scale, ::scale]
@@ -131,13 +140,22 @@ def dir2flow_2d(flow, ret_mag=False):
 
 
 # Output vesselness
-def v2vesselness(image, ves, nsample=20):
+def v2vesselness(image, ves, nsample=20, vtype='light'):
     response = 0.0
     for s in np.linspace(-2, 2, nsample):
         filt = 2*int(abs(s) < 1) - 1
         i_val = resample_from_flow_2d(image, s*ves)
         # Compute the convolution I * f
         response = response + i_val * filt
+    # Correct the response accordingly
+    if vtype == 'light':
+        pass
+    elif vtype == 'dark':
+        response = -response
+    elif vtype == 'both':
+        response = torch.abs(response)
+    else:
+        raise NotImplementedError('{} type not supported in vesseltype'.format(vtype))
     return response
 
 # Give an image and vessel overlay
@@ -150,6 +168,7 @@ def overlay(image, ves, alpha=0.4):
     cimg = []
     cimg_converter = plt.get_cmap('jet')
     randstr = np.random.choice(ALPHABET, size=20)
+    randstr = "".join(list(randstr))
     for i in range(B):
         v = np.abs(ves[i, 0].detach().numpy()) + 0
         v = (v - v.min()) / (v.max() - v.min() + 1e-10)

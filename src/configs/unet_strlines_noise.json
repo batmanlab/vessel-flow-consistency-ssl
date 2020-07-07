@@ -1,5 +1,5 @@
 {
-    "name": "drive_vessel_toy",
+    "name": "strlinesnoise_unet_dampen",
     "n_gpu": 2,
     "arch": {
         "type": "UNet",
@@ -10,14 +10,14 @@
     },
     "log_dir": "/pghbio/dbmi/batmanlab/rohit33/saved_models",
     "data_loader": {
-        "type": "DRIVEDataLoader",
+        "type": "ToyStrLineLoader",
         "args": {
-            "data_dir": "/pghbio/dbmi/batmanlab/rohit33/DRIVE/",
-            "batch_size": 8,
+            "img_size": 64,
+            "noise": 0.05,
+            "batch_size": 4,
             "shuffle": true,
             "validation_split": 0.2,
-            "num_workers": 4,
-            "toy": true
+            "num_workers": 4
         }
     },
     "optimizer": {
@@ -41,8 +41,7 @@
         "lambda_length": 1,
         "lambda_template": 1,
         "num_samples_template": 20,
-        "lambda_followupv": 0.5,
-        "lambda_perlength": 0.001
+        "lambda_perlength": 0
     },
     "metrics": [
         "recon_error_l2"
@@ -61,9 +60,7 @@
         "verbosity": 2,
         "monitor": "min val_loss",
         "early_stop": 100,
-        "quiver_scale": 2,
-        "normalize_flow": true,
-        "normalize_flow_rev": true,
+        "img_log_step": 1,
         "tensorboard": true
     }
 }

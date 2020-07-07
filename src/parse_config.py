@@ -118,6 +118,10 @@ class ConfigParser:
         """Access items like ordinary dict."""
         return self.config[name]
 
+    def get(self, name, default=None):
+        """ Get items with a default like in a dict """
+        return self.config.get(name, default)
+
     def get_logger(self, name, verbosity=2):
         msg_verbosity = 'verbosity option {} is invalid. Valid options are {}.'.format(verbosity, self.log_levels.keys())
         assert verbosity in self.log_levels, msg_verbosity

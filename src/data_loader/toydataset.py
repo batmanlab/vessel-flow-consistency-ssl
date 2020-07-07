@@ -8,10 +8,11 @@ from PIL import Image
 
 class ToyStrLines(Dataset):
 
-    def __init__(self, img_size, train=True, holesize=0):
+    def __init__(self, img_size, train=True, holesize=0, noise=0, dark=False):
         self.img_size = img_size
         self.holesize = holesize
-
+        self.noise = noise
+        self.dark = dark
 
     def __len__(self):
         return (15 - 3 + 1) * 180
@@ -21,6 +22,13 @@ class ToyStrLines(Dataset):
         rot = idx % 180
         img = self.create_straight_vessel(self.img_size, thickness, rot)
         img = img[None]
+        if self.noise > 0:
+            img = img + self.noise * np.random.randn(*img.shape)
+            img = (img - img.min())/(img.max() - img.min())
+
+        # If dark vessels are needed
+        if self.dark:
+            img = 1 - img
         return {
             'image': torch.FloatTensor(img),
             'mask' : torch.FloatTensor(img),

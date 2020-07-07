@@ -190,6 +190,11 @@ def vessel_loss_2d_dampen(output, data, config):
     l_template = args.get('lambda_template')
     num_samples_template = args.get('num_samples_template', 10)
     l_perlength = args.get('lambda_perlength')
+    # This parameter is for type of vessel
+    vessel_type = config.get('vessel_type', 'light') # should be light, dark or both
+
+    # parameter for followup vesselness
+    l_followupv = args.get('lambda_followupv')
 
     # Get outputs and inputs
     recon = output['recon']
@@ -239,15 +244,31 @@ def vessel_loss_2d_dampen(output, data, config):
             loss = loss + l_perlength * L1(v2norm)
 
         # Check profile by taking convolution with the template [-1 -1 1 1 1 1 -1 -1]
+        vessel_conv = 0.0
         if l_template:
-            loss_conv = 0.0
             for s in np.linspace(-2, 2, num_samples_template):
                 filt = 2*int(abs(s) < 1) - 1
                 i_val = resample_from_flow_2d(image, s*v2)
                 # Compute the convolution I * f
-                loss_conv = loss_conv + i_val * filt
-            # take absolute value of that correlation
-            loss = loss + l_template * (1 - loss_conv.mean()/num_samples_template)
+                vessel_conv = vessel_conv + i_val * filt
+
+            # Modify the vesselness according to parameters
+            if vessel_type == 'light':
+                pass
+            elif vessel_type == 'dark':
+                vessel_conv = -vessel_conv
+            elif vessel_type == 'both':
+                vessel_conv = torch.abs(vessel_conv)
+            else:
+                raise NotImplementedError('{} keyword for vessel type is not supported'.format(vessel_type))
+
+            loss = loss + l_template * (1 - vessel_conv.mean()/num_samples_template)
+
+        # Check for vesselness in followup
+        if l_followupv and l_template:
+            # we have already calculated the vesselness
+            followup_vessel = resample_from_flow_2d(vessel_conv, v1)
+            loss = loss + l_followupv * (1 - followup_vessel.mean()/num_samples_template)
 
     else:
         raise NotImplementedError

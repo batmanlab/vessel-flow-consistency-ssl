@@ -1,5 +1,5 @@
 {
-    "name": "drive_vessel_toy",
+    "name": "drive_vessel",
     "n_gpu": 2,
     "arch": {
         "type": "UNet",
@@ -13,13 +13,14 @@
         "type": "DRIVEDataLoader",
         "args": {
             "data_dir": "/pghbio/dbmi/batmanlab/rohit33/DRIVE/",
-            "batch_size": 8,
+            "batch_size": 2,
             "shuffle": true,
             "validation_split": 0.2,
             "num_workers": 4,
-            "toy": true
+            "toy": false
         }
     },
+    "vessel_type": "dark",
     "optimizer": {
         "type": "Adam",
         "args":{
