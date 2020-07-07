@@ -8,8 +8,8 @@
 # PyTorch modules
 
 * Pytorch implementation for power spherical distribution https://github.com/nicola-decao/power_spherical
+* Pytorch implementation for continuous neural architectures https://torchdyn.readthedocs.io/en/latest/#
 
 # Visualization tools
 * how to use Slicer in jupyter notebook: https://github.com/Slicer/SlicerNotebooks
-
 
