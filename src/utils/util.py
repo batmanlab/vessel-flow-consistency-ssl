@@ -8,6 +8,7 @@ import torch
 from numpy import pi
 import numpy as np
 from matplotlib import pyplot as plt
+import io
 from PIL import Image
 from skimage.color import hsv2rgb
 from skimage import color
@@ -86,8 +87,6 @@ def overlay_quiver(Img, flow, scale=2, normalize=True):
 
     # For each image, add quiver plot
     images = []
-    randstr = np.random.choice(ALPHABET, size=20)
-    randstr = "".join(list(randstr))
     for i in range(B):
         _img = (img[i, 0].data.cpu().numpy())
         _vx = (vx[i])[::scale, ::scale]
@@ -98,13 +97,15 @@ def overlay_quiver(Img, flow, scale=2, normalize=True):
         plt.imshow(_img, 'gray')
         plt.quiver(xx, yy, _vx, _vy, color='lightgreen')
         plt.axis('off')
-        plt.savefig('_overlay_quiver_{}.png'.format(randstr), bbox_inches='tight')
+        buf = io.BytesIO()
+        plt.savefig(buf, bbox_inches='tight')
+        buf.seek(0)
         # load it back from file
-        _tmpimg = Image.open('_overlay_quiver_{}.png'.format(randstr))
+        _tmpimg = Image.open(buf)
         _tmpimg = (np.array(_tmpimg)[:,:,:3]).transpose(2, 0, 1)[None]
         images.append(_tmpimg)
+        buf.close()
     # images
-    os.remove("_overlay_quiver_{}.png".format(randstr))
     images = np.concatenate(images, 0)
     images = torch.FloatTensor(images)
     return images
@@ -191,8 +192,6 @@ def overlay(image, ves, alpha=0.4):
     #cimg = torch.FloatTensor(np.zeros((B, 3, H, W)))
     cimg = []
     cimg_converter = plt.get_cmap('jet')
-    randstr = np.random.choice(ALPHABET, size=20)
-    randstr = "".join(list(randstr))
     for i in range(B):
         v = np.abs(ves[i, 0].detach().numpy()) + 0
         v = (v - v.min()) / (v.max() - v.min() + 1e-10)
@@ -207,8 +206,10 @@ def overlay(image, ves, alpha=0.4):
         plt.imshow(ci, 'gray')
         plt.imshow(cv, alpha=alpha)
         plt.axis('off')
-        plt.savefig("_overlay_{}.png".format(randstr), bbox_inches='tight')
-        _tmpimg = Image.open('_overlay_{}.png'.format(randstr))
+        buf = io.BytesIO()
+        plt.savefig(buf, bbox_inches='tight')
+        buf.seek(0)
+        _tmpimg = Image.open(buf)
         _tmpimg = (np.array(_tmpimg)[:,:,:3]).transpose(2, 0, 1)[None]
         cimg.append(_tmpimg)
 
@@ -221,7 +222,6 @@ def overlay(image, ves, alpha=0.4):
         f_img = color.hsv2rgb(hsv_img)
         '''
         #cimg[i] = torch.FloatTensor(f_img.transpose(2, 0, 1))
-    os.remove("_overlay_{}.png".format(randstr))
     cimg = np.concatenate(cimg, 0)
     cimg = torch.FloatTensor(cimg)
     # img is in [0, 1]  --> [B, 1, H, W]
