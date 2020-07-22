@@ -98,7 +98,7 @@ def overlay_quiver(Img, flow, scale=2, normalize=True):
         plt.quiver(xx, yy, _vx, _vy, color='lightgreen')
         plt.axis('off')
         buf = io.BytesIO()
-        plt.savefig(buf, bbox_inches='tight')
+        plt.savefig(buf, format='png', bbox_inches='tight')
         buf.seek(0)
         # load it back from file
         _tmpimg = Image.open(buf)
@@ -207,11 +207,12 @@ def overlay(image, ves, alpha=0.4):
         plt.imshow(cv, alpha=alpha)
         plt.axis('off')
         buf = io.BytesIO()
-        plt.savefig(buf, bbox_inches='tight')
+        plt.savefig(buf, format='png', bbox_inches='tight')
         buf.seek(0)
         _tmpimg = Image.open(buf)
         _tmpimg = (np.array(_tmpimg)[:,:,:3]).transpose(2, 0, 1)[None]
         cimg.append(_tmpimg)
+        buf.close()
 
         '''
         hsv_vessel = color.rgb2hsv(cv)
