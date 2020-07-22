@@ -81,6 +81,9 @@ class VesselTrainer(BaseTrainer):
 
             # Get vessel type here
             vessel_type = self.config.get('vessel_type', 'light')
+            mask = data.get('mask')
+            if mask is not None:
+                mask = mask.cpu()
 
             # Every few steps, add some images
             if epoch % self.img_log_step == 0 and batch_idx == 0:
@@ -92,10 +95,16 @@ class VesselTrainer(BaseTrainer):
                 #self.writer.add_image('flow_rev', make_grid(dir2flow_2d(output['vessel'][:, 2:4].cpu(), ret_mag=True), nrow=4, normalize=True))
                 self.writer.add_image('flow', make_grid(overlay_quiver(data['image'].cpu(), output['vessel'][:, 0:2].cpu(), quiverscale, normflow), nrow=4, normalize=True))
                 self.writer.add_image('flow_rev', make_grid(overlay_quiver(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), quiverscale, normflowrev), nrow=4, normalize=True))
-                self.writer.add_image('v2_vesselness_only', make_grid(v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type), nrow=4, normalize=True))
-                ves = v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type)
+                self.writer.add_image('v2_vesselness_only', make_grid(v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, \
+                        mask = mask), nrow=4, normalize=True))
+                ves = v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, mask=mask)
                 overlay_img = overlay(data['image'].cpu(), ves)
                 self.writer.add_image('v2_vesselness_overlay', make_grid(overlay_img, nrow=4, normalize=True))
+
+                # Cross correlation vesselness
+                ves = v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, mask=mask, is_crosscorr=True)
+                self.writer.add_image('v2_vesselness_crosscorr', make_grid(ves, nrow=4, normalize=True))
+
                 #print(output['vessel'].max(), output['vessel'].min())
 
             if batch_idx == self.len_epoch:
@@ -140,6 +149,11 @@ class VesselTrainer(BaseTrainer):
                 for met in self.metric_ftns:
                     self.valid_metrics.update(met.__name__, met(output, data))
 
+                # Get vessel mask
+                mask = data.get('mask')
+                if mask is not None:
+                    mask = mask.cpu()
+
                 if epoch % self.img_log_step == 0 and batch_idx == 0:
                     self.writer.add_image('input', make_grid(0.5 + 0.5*data['image'].cpu(), nrow=4, normalize=True))
                     self.writer.add_image('recon', make_grid(0.5 + 0.5*output['recon'].cpu(), nrow=4, normalize=True))
@@ -149,10 +163,15 @@ class VesselTrainer(BaseTrainer):
                     #self.writer.add_image('flow_rev', make_grid(dir2flow_2d(output['vessel'][:, 2:4].cpu(), ret_mag=True), nrow=4, normalize=True))
                     self.writer.add_image('flow', make_grid(overlay_quiver(data['image'].cpu(), output['vessel'][:, 0:2].cpu(), quiverscale, normflow), nrow=4, normalize=True))
                     self.writer.add_image('flow_rev', make_grid(overlay_quiver(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), quiverscale, normflowrev), nrow=4, normalize=True))
-                    self.writer.add_image('v2_vesselness_only', make_grid(v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type), nrow=4, normalize=True))
-                    ves = v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type)
+                    self.writer.add_image('v2_vesselness_only', make_grid(v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, \
+                            mask=mask), nrow=4, normalize=True))
+                    ves = v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, mask=mask)
                     overlay_img = overlay(data['image'].cpu(), ves)
                     self.writer.add_image('v2_vesselness_overlay', make_grid(overlay_img, nrow=4, normalize=True))
+
+                    # Cross correlation vesselness
+                    ves = v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, mask=mask, is_crosscorr=True)
+                    self.writer.add_image('v2_vesselness_crosscorr', make_grid(ves, nrow=4, normalize=True))
 
         # add histogram of model parameters to the tensorboard
         for name, p in self.model.named_parameters():

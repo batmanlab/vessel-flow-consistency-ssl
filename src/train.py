@@ -39,6 +39,7 @@ def main(config):
 
     lr_scheduler = config.init_obj('lr_scheduler', torch.optim.lr_scheduler, optimizer)
 
+    print(config)
     trainer = VesselTrainer(model, criterion, metrics, optimizer,
                       config=config,
                       data_loader=data_loader,

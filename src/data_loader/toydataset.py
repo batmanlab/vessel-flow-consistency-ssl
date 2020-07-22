@@ -31,7 +31,7 @@ class ToyStrLines(Dataset):
             img = 1 - img
         return {
             'image': torch.FloatTensor(img),
-            'mask' : torch.FloatTensor(img),
+            #'mask' : torch.FloatTensor(img),
         }
 
 
@@ -82,7 +82,7 @@ class ToySlantLines(Dataset):
         img = img[None]
         return {
             'image': torch.FloatTensor(img),
-            'mask' : torch.FloatTensor(img),
+            #'mask' : torch.FloatTensor(img),
         }
 
 
@@ -127,7 +127,7 @@ class ToyCurvedLines(Dataset):
         img = img[None]
         return {
             'image': torch.FloatTensor(img),
-            'mask' : torch.FloatTensor(img)
+            #'mask' : torch.FloatTensor(img)
         }
 
     def image_sample(self, Img, x, y, cval=0):

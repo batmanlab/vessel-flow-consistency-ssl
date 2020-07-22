@@ -140,13 +140,23 @@ def dir2flow_2d(flow, ret_mag=False):
 
 
 # Output vesselness
-def v2vesselness(image, ves, nsample=20, vtype='light'):
+def v2vesselness(image, ves, nsample=20, vtype='light', mask=None, percentile=100, is_crosscorr=False):
     response = 0.0
+    i_range = []
     for s in np.linspace(-2, 2, nsample):
         filt = 2*int(abs(s) < 1) - 1
         i_val = resample_from_flow_2d(image, s*ves)
+        if is_crosscorr:
+            i_range.append(i_val.detach()[:, None])
         # Compute the convolution I * f
         response = response + i_val * filt
+
+    # Normalize
+    if is_crosscorr:
+        i_range = torch.cat(i_range, 1)   # [B, 20, 1, H, W]
+        i_std = i_range.std(1) + 1e-10    # [B, 1, H, W]
+        response = response / i_std
+
     # Correct the response accordingly
     if vtype == 'light':
         pass
@@ -156,6 +166,20 @@ def v2vesselness(image, ves, nsample=20, vtype='light'):
         response = torch.abs(response)
     else:
         raise NotImplementedError('{} type not supported in vesseltype'.format(vtype))
+
+    # We got the response, now subtract from mean and multiply with optional mask
+    response = response - response.min()
+    if mask is not None:
+        response = response * mask
+        # Change percentile
+        if percentile < 100:
+            for i in range(response.shape[0]):
+                r = response[i] + 0
+                r = r.data.cpu().numpy()
+                per_val = np.percentile(r, percentile)
+                r[r > per_val] = per_val
+                response[i] = torch.FloatTensor(r)
+
     return response
 
 # Give an image and vessel overlay
