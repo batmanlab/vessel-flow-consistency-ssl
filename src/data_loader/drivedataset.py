@@ -13,6 +13,7 @@ class DriveDataset(Dataset):
     def __init__(self, data_dir, train=True, toy=False, preprocessing=False):
         self.data_dir = data_dir
         self.train = train
+        self.disk = disk(6)
         self.preprocessing = preprocessing
         self.toy = toy
         self.trainstr = 'training' if train else 'test'
@@ -75,11 +76,13 @@ class DriveDataset(Dataset):
             img = img[..., 1]  # extract green channel only
             # Apply more preprocessing
             if self.preprocessing:
-                img = (img - img.min())/(img.max() - img.min())
+                img = (img - img.min())/(img.max() - img.min() + 1e-10)
                 img = 1 - img
                 img = img * mask[0]
                 img = nd.gaussian_filter(img, 0.45)
-                img = (img - img.min())/(img.max() - img.min())
+                img = white_tophat(img, self.disk)
+                img = img * mask[0]
+                img = (img - img.min())/(img.max() - img.min() + 1e-10)
             else:
                 img = nd.gaussian_filter(img, 0.45)
 

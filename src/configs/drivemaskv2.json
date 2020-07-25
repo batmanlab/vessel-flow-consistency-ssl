@@ -58,12 +58,12 @@
         }
     },
     "trainer": {
-        "epochs": 1000,
+        "epochs": 5000,
         "save_dir": "/pghbio/dbmi/batmanlab/rohit33/saved_models",
         "save_period": 25,
         "verbosity": 2,
         "monitor": "min val_loss",
-        "early_stop": 100,
+        "early_stop": 1000,
         "quiver_scale": 2,
         "normalize_flow": true,
         "normalize_flow_rev": true,

@@ -194,6 +194,7 @@ def vessel_loss_2d_dampen(output, data, config):
     l_template = args.get('lambda_template')
     num_samples_template = args.get('num_samples_template', 10)
     l_perlength = args.get('lambda_perlength')
+    detach = args.get('detach', True)
     # This parameter is for type of vessel
     vessel_type = config.get('vessel_type', 'light') # should be light, dark or both
 
@@ -265,7 +266,10 @@ def vessel_loss_2d_dampen(output, data, config):
                 filt = 2*int(abs(s) < 1) - 1
                 i_val = resample_from_flow_2d(image, s*v2)   # image is [B, 1, H, W], so is i_val
                 # save it
-                i_range.append(i_val.detach()[:, None])
+                if detach:
+                    i_range.append(i_val.detach()[:, None])
+                else:
+                    i_range.append(i_val[:, None])
                 # Compute the convolution I * f
                 vessel_conv = vessel_conv + i_val * filt
 
