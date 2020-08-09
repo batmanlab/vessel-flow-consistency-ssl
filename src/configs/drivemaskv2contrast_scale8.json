@@ -1,5 +1,5 @@
 {
-    "name": "drive_vessel_mask",
+    "name": "drive_vessel_mask_contrast",
     "n_gpu": 2,
     "arch": {
         "type": "UNet",
@@ -11,7 +11,7 @@
     },
     "log_dir": "/pghbio/dbmi/batmanlab/rohit33/saved_models",
     "data_loader": {
-        "type": "DRIVEDataLoader",
+        "type": "DRIVEContrastDataLoader",
         "args": {
             "data_dir": "/pghbio/dbmi/batmanlab/rohit33/DRIVE/",
             "batch_size": 2,
@@ -38,16 +38,16 @@
         "loss_intensity": "L2",
         "lambda_intensity": 0.1,
         "lambda_consistency": 0.2,
-        "lambda_cosine": 1,
+        "lambda_cosine": 0.1,
         "lambda_decoder": 1,
-        "lambda_length": 1,
+        "lambda_length": 0,
         "lambda_template": 5,
         "is_crosscorr": true,
         "use_mask": true,
         "detach": true,
         "num_samples_template": 20,
         "lambda_followupv": 0,
-        "lambda_perlength": 0.1
+        "lambda_perlength": 0.01
     },
     "metrics": [
         "recon_error_l2"

@@ -12,7 +12,7 @@ import io
 from PIL import Image
 from skimage.color import hsv2rgb
 from skimage import color
-from model.loss import resample_from_flow_2d
+from model.loss import resample_from_flow_2d, v2vesselness, v2_sq_vesselness, v2_path_vesselness
 import string
 
 ALPHABET = np.array(list(string.ascii_lowercase))
@@ -139,49 +139,20 @@ def dir2flow_2d(flow, ret_mag=False):
             rgb[i] = torch.FloatTensor(rgb_i)
         return rgb.permute(0, 3, 1, 2)
 
+def v2transpose_vesselness(image, ves, nsample=20, vtype='light', mask=None, percentile=100, is_crosscorr=False):
+    ves2 = ves*0
+    ves2[:, 0] = -ves[:, 1]
+    ves2[:, 1] = ves[:, 0]
+    #return v2vesselness(image, ves2, nsample, vtype, mask, percentile, is_crosscorr)
+    # Calculate the std deviation here
+    response = []
+    for s in np.linspace(-1, 1, nsample):
+        i_val = resample_from_flow_2d(image, s*ves2)
+        response.append(i_val.detach()[:, None])
+    response = torch.cat(response, 1)
+    v = response.std(1)
+    return v
 
-# Output vesselness
-def v2vesselness(image, ves, nsample=20, vtype='light', mask=None, percentile=100, is_crosscorr=False):
-    response = 0.0
-    i_range = []
-    for s in np.linspace(-2, 2, nsample):
-        filt = 2*int(abs(s) < 1) - 1
-        i_val = resample_from_flow_2d(image, s*ves)
-        if is_crosscorr:
-            i_range.append(i_val.detach()[:, None])
-        # Compute the convolution I * f
-        response = response + i_val * filt
-
-    # Normalize
-    if is_crosscorr:
-        i_range = torch.cat(i_range, 1)   # [B, 20, 1, H, W]
-        i_std = i_range.std(1) + 1e-10    # [B, 1, H, W]
-        response = response / i_std
-
-    # Correct the response accordingly
-    if vtype == 'light':
-        pass
-    elif vtype == 'dark':
-        response = -response
-    elif vtype == 'both':
-        response = torch.abs(response)
-    else:
-        raise NotImplementedError('{} type not supported in vesseltype'.format(vtype))
-
-    # We got the response, now subtract from mean and multiply with optional mask
-    response = response - response.min()
-    if mask is not None:
-        response = response * mask
-        # Change percentile
-        if percentile < 100:
-            for i in range(response.shape[0]):
-                r = response[i] + 0
-                r = r.data.cpu().numpy()
-                per_val = np.percentile(r, percentile)
-                r[r > per_val] = per_val
-                response[i] = torch.FloatTensor(r)
-
-    return response
 
 # Give an image and vessel overlay
 def overlay(image, ves, alpha=0.4):

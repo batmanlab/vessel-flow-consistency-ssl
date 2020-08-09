@@ -21,9 +21,20 @@ class DRIVEDataLoader(BaseDataLoader):
     '''
     Dataloader for DRIVE dataset
     '''
-    def __init__(self, data_dir, batch_size, shuffle=True, validation_split=0.0, num_workers=1, training=True, toy=False, preprocessing=False):
+    def __init__(self, data_dir, batch_size, shuffle=True, validation_split=0.0, num_workers=1, training=True, toy=False, augment=True, preprocessing=False, idx=None):
         self.data_dir = data_dir
-        self.dataset = DriveDataset(self.data_dir, train=training, toy=toy, preprocessing=preprocessing)
+        self.dataset = DriveDataset(self.data_dir, train=training, toy=toy, preprocessing=preprocessing, \
+                                    augment=augment, idx=idx)
+        super().__init__(self.dataset, batch_size, shuffle, validation_split, num_workers)
+
+
+class DRIVEContrastDataLoader(BaseDataLoader):
+    '''
+    Dataloader for DRIVE dataset
+    '''
+    def __init__(self, data_dir, batch_size, shuffle=True, validation_split=0.0, num_workers=1, training=True, toy=False, augment=True, preprocessing=True, idx=None):
+        self.data_dir = data_dir
+        self.dataset = DriveContrastDataset(self.data_dir, train=training, toy=toy, preprocessing=preprocessing, augment=augment, idx=idx)
         super().__init__(self.dataset, batch_size, shuffle, validation_split, num_workers)
 
 

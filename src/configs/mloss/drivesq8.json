@@ -1,5 +1,5 @@
 {
-    "name": "drive_vessel_mask",
+    "name": "drivesq8",
     "n_gpu": 2,
     "arch": {
         "type": "UNet",
@@ -14,7 +14,7 @@
         "type": "DRIVEDataLoader",
         "args": {
             "data_dir": "/pghbio/dbmi/batmanlab/rohit33/DRIVE/",
-            "batch_size": 2,
+            "batch_size": 4,
             "shuffle": true,
             "validation_split": 0.2,
             "num_workers": 4,
@@ -30,7 +30,7 @@
             "amsgrad": true
         }
     },
-    "loss": "vessel_loss_2d_dampen",
+    "loss": "vessel_loss_2d_sq",
     "loss_args": {
         "num_directions": 2,
         "eps": 1e-1,
@@ -45,7 +45,7 @@
         "is_crosscorr": true,
         "use_mask": true,
         "detach": true,
-        "num_samples_template": 20,
+        "num_samples_template": 10,
         "lambda_followupv": 0,
         "lambda_perlength": 0.1
     },
