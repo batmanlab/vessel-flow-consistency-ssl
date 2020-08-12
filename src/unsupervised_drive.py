@@ -107,7 +107,7 @@ def main():
     print(len(dataset))
     for i in range(len(dataset)):
         img = dataset[i]['image'][0].data.cpu().numpy()
-        lab = gtdataset[i]['image'][0].data.cpu().numpy()
+        lab = (gtdataset[i]['image'][0].data.cpu().numpy() > 0.5).astype(int)
         mask = dataset[i]['mask'][0].data.cpu().numpy()
         # Get vesselness
         ves = vfunc(img, i)

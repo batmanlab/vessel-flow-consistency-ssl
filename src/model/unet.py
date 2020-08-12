@@ -79,10 +79,11 @@ class OutConv(nn.Module):
 """ Full assembly of the parts to form the complete network """
 
 class UNet(nn.Module):
-    def __init__(self, inp_channels=1, out_channels=4, vessel_scale_factor=16, bilinear=True):
+    def __init__(self, inp_channels=1, out_channels=4, min_scale=0, vessel_scale_factor=16, bilinear=True):
         super(UNet, self).__init__()
         self.inp_channels = inp_channels
         self.out_channels = out_channels
+        self.min_scale = min_scale
         self.vessel_scale_factor = vessel_scale_factor
         self.bilinear = bilinear
 
@@ -122,6 +123,7 @@ class UNet(nn.Module):
             direction = out[:, 2*i:2*i+2]
             scale = (out[:, 2*chan + i])[:, None]
             scale = self.vessel_scale_factor * torch.sigmoid(scale)
+            scale = scale + self.min_scale
             norm = torch.sqrt(1e-10 + (direction**2).sum(1))[:, None]
             ves.append(direction / norm * scale)
         out = torch.cat(ves, 1)

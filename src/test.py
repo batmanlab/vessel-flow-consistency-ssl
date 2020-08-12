@@ -10,6 +10,7 @@ import model.metric as module_metric
 import model.model as module_arch
 from parse_config import ConfigParser
 from utils import dir2flow_2d, v2vesselness, v2transpose_vesselness, overlay, overlay_quiver
+from utils.util import *
 
 def to_device(data, device):
     for k, v in data.items():
@@ -33,6 +34,14 @@ def main(config):
         num_workers=2
     )
 
+    ## Vesselness function
+    if config.config['loss'] == 'vessel_loss_2d_sq':
+        vesselfunc = v2_sq_vesselness
+    elif config.config['loss'] == 'vessel_loss_2d_path':
+        vesselfunc = v2_path_vesselness
+    else:
+        vesselfunc = v2vesselness
+
     # build model architecture
     model = config.init_obj('arch', module_arch)
     logger.info(model)
@@ -46,8 +55,13 @@ def main(config):
     state_dict = checkpoint['state_dict']
     if config['n_gpu'] > 1:
         model = torch.nn.DataParallel(model)
-    model.load_state_dict(state_dict)
 
+    try:
+        model.load_state_dict(state_dict)
+    except:
+        model.module.load_state_dict(state_dict)
+
+    print("Using vessel function: {}".format(vesselfunc))
     # prepare model for testing
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = model.to(device)
@@ -69,7 +83,7 @@ def main(config):
             if mask is not None:
                 mask = mask.cpu()
 
-            ves = v2vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, mask=mask, is_crosscorr=False)
+            ves = vesselfunc(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, mask=mask, is_crosscorr=True)
             ves = ves.data.cpu().numpy()
 
             # Add the other frangi-like term
@@ -82,6 +96,10 @@ def main(config):
             # computing loss, metrics on test set
             with open('vesselness.pkl', 'wb') as fi:
                 pkl.dump(ves, fi)
+
+            # store everything in another pickle file
+            with open('analysis.pkl', 'wb') as fi:
+                torch.save({'data': data, 'output': output}, fi)
 
             I = np.random.randint(20)
             plt.subplot(121)

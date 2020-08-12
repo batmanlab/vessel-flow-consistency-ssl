@@ -9,7 +9,7 @@ def null_fn(*args):
 print_fn = null_fn
 
 # Output vesselness
-def v2vesselness(image, ves, nsample=20, vtype='light', mask=None, percentile=100, is_crosscorr=False, **kwargs):
+def v2vesselness(image, ves, nsample=20, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1=None, parallel_scale=2):
     response = 0.0
     i_range = []
     for s in np.linspace(-2, 2, nsample):
@@ -43,7 +43,7 @@ def v2vesselness(image, ves, nsample=20, vtype='light', mask=None, percentile=10
     return response
 
 # Output vesselness over square filters
-def v2_sq_vesselness(image, ves, nsample=10, vtype='light', mask=None, percentile=100, is_crosscorr=False, **kwargs):
+def v2_sq_vesselness(image, ves, nsample=10, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2):
     response = 0.0
     i_range = []
 
@@ -51,12 +51,11 @@ def v2_sq_vesselness(image, ves, nsample=10, vtype='light', mask=None, percentil
     v1[:, 1] = ves[:, 0]
     v1[:, 0] = -ves[:, 1]
 
-    for sv in np.linspace(-2, 2, nsample):
-        im = resample_from_flow_2d(image, sv*v1)
+    for sv in np.linspace(-parallel_scale, parallel_scale, nsample):
         # Get perp profile
         for s in np.linspace(-2, 2, nsample):
             filt = 2*int(abs(s) < 1) - 1
-            i_val = resample_from_flow_2d(im, s*ves)
+            i_val = resample_from_flow_2d(image, s*ves + sv*v1)
             if is_crosscorr:
                 i_range.append(i_val.detach()[:, None])
             # Compute the convolution I * f
@@ -416,6 +415,8 @@ def vessel_loss_2d_sq(output, data, config):
     # parameter for followup vesselness
     l_followupv = args.get('lambda_followupv')
 
+    parallel_scale = args.get('parallel_scale', 2)
+
     # check if we want to minimize cross correlation
     is_crosscorr = args.get('is_crosscorr', False)
 
@@ -474,7 +475,7 @@ def vessel_loss_2d_sq(output, data, config):
         # Check profile by taking convolution with the template [-1 -1 1 1 1 1 -1 -1]
         vessel_conv = 0.0
         if l_template:
-            vessel_conv = v2_sq_vesselness(image, v2, num_samples_template, vessel_type, is_crosscorr=is_crosscorr)
+            vessel_conv = v2_sq_vesselness(image, v2, num_samples_template, vessel_type, is_crosscorr=is_crosscorr, parallel_scale=parallel_scale)
             loss = loss + l_template * (1 - (mask*vessel_conv).mean())
 
         # Check for vesselness in followup

@@ -91,6 +91,7 @@ class VesselTrainer(BaseTrainer):
 
             # Get vessel type here
             vessel_type = self.config.get('vessel_type', 'light')
+            parallel_scale = self.config.config['loss_args'].get('parallel_scale', 2)
             mask = data.get('mask')
             if mask is not None:
                 mask = mask.cpu()
@@ -106,13 +107,13 @@ class VesselTrainer(BaseTrainer):
                 self.writer.add_image('flow', make_grid(overlay_quiver(data['image'].cpu(), output['vessel'][:, 0:2].cpu(), quiverscale, normflow), nrow=4, normalize=True))
                 self.writer.add_image('flow_rev', make_grid(overlay_quiver(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), quiverscale, normflowrev), nrow=4, normalize=True))
                 self.writer.add_image('v2_vesselness_only', make_grid(self.vesselfunc(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, \
-                        mask = mask, v1 = output['vessel'][:, :2].cpu()), nrow=4, normalize=True))
-                ves = self.vesselfunc(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, mask=mask, v1 = output['vessel'][:, :2].cpu())
+                        mask = mask, v1 = output['vessel'][:, :2].cpu(), parallel_scale=parallel_scale), nrow=4, normalize=True))
+                ves = self.vesselfunc(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, mask=mask, v1 = output['vessel'][:, :2].cpu(), parallel_scale=parallel_scale)
                 overlay_img = overlay(data['image'].cpu(), ves)
                 self.writer.add_image('v2_vesselness_overlay', make_grid(overlay_img, nrow=4, normalize=True))
 
                 # Cross correlation vesselness
-                ves = self.vesselfunc(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, mask=mask, is_crosscorr=True, v1 = output['vessel'][:, :2].cpu())
+                ves = self.vesselfunc(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, mask=mask, is_crosscorr=True, v1 = output['vessel'][:, :2].cpu(), parallel_scale=parallel_scale)
                 self.writer.add_image('v2_vesselness_crosscorr', make_grid(ves, nrow=4, normalize=True))
 
                 #print(output['vessel'].max(), output['vessel'].min())
@@ -144,6 +145,7 @@ class VesselTrainer(BaseTrainer):
 
         # Get vessel type here
         vessel_type = self.config.get('vessel_type', 'light')
+        parallel_scale = self.config.config['loss_args'].get('parallel_scale', 2)
 
         self.model.eval()
         self.valid_metrics.reset()
@@ -174,13 +176,13 @@ class VesselTrainer(BaseTrainer):
                     self.writer.add_image('flow', make_grid(overlay_quiver(data['image'].cpu(), output['vessel'][:, 0:2].cpu(), quiverscale, normflow), nrow=4, normalize=True))
                     self.writer.add_image('flow_rev', make_grid(overlay_quiver(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), quiverscale, normflowrev), nrow=4, normalize=True))
                     self.writer.add_image('v2_vesselness_only', make_grid(self.vesselfunc(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, \
-                            mask=mask, v1 = output['vessel'][:, :2].cpu()), nrow=4, normalize=True))
-                    ves = self.vesselfunc(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, mask=mask, v1 = output['vessel'][:, :2].cpu())
+                            mask=mask, v1 = output['vessel'][:, :2].cpu(), parallel_scale=parallel_scale), nrow=4, normalize=True))
+                    ves = self.vesselfunc(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, mask=mask, v1 = output['vessel'][:, :2].cpu(), parallel_scale=parallel_scale)
                     overlay_img = overlay(data['image'].cpu(), ves)
                     self.writer.add_image('v2_vesselness_overlay', make_grid(overlay_img, nrow=4, normalize=True))
 
                     # Cross correlation vesselness
-                    ves = self.vesselfunc(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, mask=mask, is_crosscorr=True, v1 = output['vessel'][:, :2].cpu())
+                    ves = self.vesselfunc(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, mask=mask, is_crosscorr=True, v1 = output['vessel'][:, :2].cpu(), parallel_scale=parallel_scale)
                     self.writer.add_image('v2_vesselness_crosscorr', make_grid(ves, nrow=4, normalize=True))
 
         # add histogram of model parameters to the tensorboard

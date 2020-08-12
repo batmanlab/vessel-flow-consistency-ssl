@@ -1,5 +1,5 @@
 {
-    "name": "drivepath16",
+    "name": "drive_toyconfig",
     "n_gpu": 2,
     "arch": {
         "type": "UNet",
@@ -11,7 +11,7 @@
     },
     "log_dir": "/pghbio/dbmi/batmanlab/rohit33/saved_models",
     "data_loader": {
-        "type": "DRIVEDataLoader",
+        "type": "DRIVEContrastDataLoader",
         "args": {
             "data_dir": "/pghbio/dbmi/batmanlab/rohit33/DRIVE/",
             "batch_size": 4,
@@ -25,30 +25,29 @@
     "optimizer": {
         "type": "Adam",
         "args":{
-            "lr": 0.0003,
+            "lr": 0.001,
             "weight_decay": 0,
             "amsgrad": true
         }
     },
-    "loss": "vessel_loss_2d_path",
+    "loss": "vessel_loss_2d",
     "loss_args": {
         "num_directions": 2,
         "eps": 1e-1,
         "uncertainty": false,
         "loss_intensity": "L2",
-        "lambda_intensity": 0,
-        "lambda_consistency": 0.1,
+        "lambda_intensity": 3,
+        "lambda_consistency": 1,
         "lambda_cosine": 1,
         "lambda_decoder": 1,
         "lambda_length": 1,
-        "lambda_template": 5,
-        "lambda_profile": 0.5,
+        "lambda_template": 1,
         "is_crosscorr": true,
         "use_mask": true,
         "detach": true,
-        "num_samples_template": 10,
-        "lambda_followupv": 0,
-        "lambda_perlength": 0.1
+        "num_samples_template": 20,
+        "lambda_followupv": 0.5,
+        "lambda_perlength": 0.001
     },
     "metrics": [
         "recon_error_l2"
@@ -61,12 +60,12 @@
         }
     },
     "trainer": {
-        "epochs": 5000,
+        "epochs": 1000,
         "save_dir": "/pghbio/dbmi/batmanlab/rohit33/saved_models",
         "save_period": 25,
         "verbosity": 2,
         "monitor": "min val_loss",
-        "early_stop": 1000,
+        "early_stop": 100,
         "quiver_scale": 2,
         "normalize_flow": true,
         "normalize_flow_rev": true,
