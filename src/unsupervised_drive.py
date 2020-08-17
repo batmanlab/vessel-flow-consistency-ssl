@@ -28,8 +28,9 @@ def vesselness_file(filename):
 
     def v(img, i):
         #return data[i, 0]
-        img = cv2.medianBlur(data[i, 0], 5)
-        return img
+        #img = cv2.medianBlur(data[i, 0], 5)
+        #return img
+        return -data[i, 0]
     return v
 
 
