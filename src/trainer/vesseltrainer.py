@@ -47,6 +47,8 @@ class VesselTrainer(BaseTrainer):
             self.vesselfunc = v2vesselness
         elif self.config['loss'] == 'vessel_loss_2d_curved':
             self.vesselfunc = v2_curved_vesselness
+        elif self.config['loss'] == 'vessel_loss_2d_ode':
+            self.vesselfunc = v2_ode_vesselness
         elif self.config['loss'] == 'vessel_loss_2d_sqmax':
             self.vesselfunc = v2_sqmax_vesselness
         else:

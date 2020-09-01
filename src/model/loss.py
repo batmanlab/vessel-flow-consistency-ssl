@@ -837,14 +837,15 @@ class ODEVesselness(nn.Module):
         self.is_crosscorr = is_crosscorr
         self.nsample = nsample
 
+
     def forward(self, t, data):
         # Data is of size [B, 3, H, W] where first channel is vesselness, other 2 channels are x, y
         v = data[:, :1]
         x = data[:, 1:]
         # Calculate the derivatives based on displacement
         v2_x = resample_from_flow_2d(self.v2, x)
-        irange1 = []
-        irange2 = []
+        i_range1 = []
+        i_range2 = []
         res1, res2 = 0, 0
         D = 0
         # Calculate response
@@ -894,8 +895,8 @@ def v2_ode_vesselness(image, ves, nsample=12, vtype='light', mask=None, percenti
     Nscale, timestep = parallel_scale
     B, _, H, W = image.shape
     vxy_0 = torch.zeros((B, 3, H, W)).to(image.device)
-    vxy_t1 = odeint(func, vxy_0, torch.linspace(0, Nscale, timestep))  # Going forwards
-    vxy_t2 = odeint(func, vxy_0, torch.linspace(0, -Nscale, timestep))  # Going backwards, note that this vesselness will be negative
+    vxy_t1 = odeint(func, vxy_0, torch.linspace(0, Nscale, timestep).to(image.device))  # Going forwards
+    vxy_t2 = odeint(func, vxy_0, torch.linspace(0, -Nscale, timestep).to(image.device))  # Going backwards, note that this vesselness will be negative
     v1 = vxy_t1[-1, :, :1]
     v2 = -vxy_t2[-1, :, :1]
     v = (v1 + v2)/2.0
