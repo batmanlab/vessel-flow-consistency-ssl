@@ -43,8 +43,15 @@ class VesselTrainer(BaseTrainer):
             self.vesselfunc = v2_sq_vesselness
         elif self.config['loss'] == 'vessel_loss_2d_path':
             self.vesselfunc = v2_path_vesselness
-        else:
+        elif self.config['loss'] == 'vessel_loss_2d_dampen':
             self.vesselfunc = v2vesselness
+        elif self.config['loss'] == 'vessel_loss_2d_curved':
+            self.vesselfunc = v2_curved_vesselness
+        elif self.config['loss'] == 'vessel_loss_2d_sqmax':
+            self.vesselfunc = v2_sqmax_vesselness
+        else:
+            assert False, 'Unknown loss function {}'.format(self.config['loss'])
+
         print("Using vesselness function", self.vesselfunc)
 
     def _to_device(self, data):

@@ -45,7 +45,7 @@
         "is_crosscorr": true,
         "use_mask": true,
         "detach": true,
-        "num_samples_template": 10,
+        "num_samples_template": 12,
         "lambda_followupv": 0,
         "lambda_perlength": 0.1
     },

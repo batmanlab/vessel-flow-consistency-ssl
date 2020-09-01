@@ -1,5 +1,5 @@
 {
-    "name": "drivesq8_minscale1",
+    "name": "drivesq4_ps4",
     "n_gpu": 2,
     "arch": {
         "type": "UNet",
@@ -7,7 +7,7 @@
             "inp_channels": 1,
             "out_channels": 4,
             "min_scale": 0.5,
-            "vessel_scale_factor": 7.5
+            "vessel_scale_factor": 4.5
         }
     },
     "log_dir": "/pghbio/dbmi/batmanlab/rohit33/saved_models",
@@ -43,6 +43,7 @@
         "lambda_decoder": 1,
         "lambda_length": 1,
         "lambda_template": 5,
+        "parallel_scale": 4,
         "is_crosscorr": true,
         "use_mask": true,
         "detach": true,

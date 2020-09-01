@@ -1,6 +1,8 @@
 import torch
+from torch import nn
 import torch.nn.functional as F
 import numpy as np
+from torchdiffeq import odeint_adjoint as odeint
 
 def null_fn(*args):
     return None
@@ -37,35 +39,125 @@ def v2vesselness(image, ves, nsample=20, vtype='light', mask=None, percentile=10
         raise NotImplementedError('{} type not supported in vesseltype'.format(vtype))
 
     # We got the response, now subtract from mean and multiply with optional mask
-    response = response - response.min()
+    response = response - response.min().detach()
     if mask is not None:
         response = response * mask
     return response
 
-# Output vesselness over square filters
-def v2_sq_vesselness(image, ves, nsample=10, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2):
-    response = 0.0
-    i_range = []
+def v2_sqmax_vesselness(image, ves, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2):
+    response1 = 0.0
+    response2 = 0.0
+    i_range1 = []
+    i_range2 = []
 
     v1 = ves*0
     v1[:, 1] = ves[:, 0]
     v1[:, 0] = -ves[:, 1]
 
+    D = 0
     for sv in np.linspace(-parallel_scale, parallel_scale, nsample):
         # Get perp profile
         for s in np.linspace(-2, 2, nsample):
             filt = 2*int(abs(s) < 1) - 1
+            D += filt
             i_val = resample_from_flow_2d(image, s*ves + sv*v1)
             if is_crosscorr:
-                i_range.append(i_val.detach()[:, None])
+                if s < 0:
+                    i_range1.append(i_val.detach()[:, None])
+                else:
+                    i_range2.append(i_val.detach()[:, None])
             # Compute the convolution I * f
-            response = response + (i_val * filt)/(nsample**2)
+            if s < 0:
+                response1 = response1 + (i_val * filt)
+            else:
+                response2 = response2 + (i_val * filt)
+
+    # Uncomment below if using both sides
+    #response = response1 + response2
 
     # Normalize
     if is_crosscorr:
-        i_range = torch.cat(i_range, 1)   # [B, 20, 1, H, W]
-        i_std = i_range.std(1) + 1e-2    # [B, 1, H, W]
-        response = response / i_std
+        '''
+        # Average of both sides (normal)
+        i_range = torch.cat(i_range1 + i_range2, 1)
+        i_std = i_range.std(1, unbiased=False) + 1e-5
+        response = response / i_std / (nsample**2)
+        # Check assertion
+        idx = (-1 <= response)*(response <= 1)
+        idx = (~idx).sum().item()
+        assert idx == 0, '{} {}'.format(idx, np.prod(list(response.shape)))
+        '''
+        # Take min of both sides
+        i_std1 = torch.cat(i_range1, 1)
+        i_std1 = i_std1.std(1, unbiased=False) + 1e-5
+        response1 = response1 / i_std1
+
+        i_std2 = torch.cat(i_range2, 1)
+        i_std2 = i_std2.std(1, unbiased=False) + 1e-5
+        response2 = response2 / i_std2
+
+
+    # Correct the response accordingly
+    if vtype == 'light':
+        response = torch.min(response1, response2)
+        pass
+    elif vtype == 'dark':
+        response = torch.min(-response1, -response2)
+        #response = -response
+    elif vtype == 'both':
+        response = torch.min(torch.abs(response1), torch.abs(response2))
+        #response = 2*torch.abs(response)
+    else:
+        raise NotImplementedError('{} type not supported in vesseltype'.format(vtype))
+
+    # We got the response, now subtract from mean and multiply with optional mask
+    response = response - response.min().detach()
+    if mask is not None:
+        response = response * mask
+    return response
+
+
+# Output vesselness over square filters
+def v2_sq_vesselness(image, ves, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2):
+    response1 = 0.0
+    response2 = 0.0
+    i_range1 = []
+    i_range2 = []
+
+    v1 = ves*0
+    v1[:, 1] = ves[:, 0]
+    v1[:, 0] = -ves[:, 1]
+
+    D = 0
+    for sv in np.linspace(-parallel_scale, parallel_scale, nsample):
+        # Get perp profile
+        for s in np.linspace(-2, 2, nsample):
+            filt = 2*int(abs(s) < 1) - 1
+            D += filt
+            i_val = resample_from_flow_2d(image, s*ves + sv*v1)
+            if is_crosscorr:
+                if s < 0:
+                    i_range1.append(i_val.detach()[:, None])
+                else:
+                    i_range2.append(i_val.detach()[:, None])
+            # Compute the convolution I * f
+            if s < 0:
+                response1 = response1 + (i_val * filt)
+            else:
+                response2 = response2 + (i_val * filt)
+
+    response = response1 + response2
+
+    # Normalize
+    if is_crosscorr:
+        # Average of both sides (normal)
+        i_range = torch.cat(i_range1 + i_range2, 1)
+        i_std = i_range.std(1, unbiased=False) + 1e-5
+        response = response / i_std / (nsample**2)
+        # Check assertion
+        idx = (-1 <= response)*(response <= 1)
+        idx = (~idx).sum().item()
+        assert idx == 0, '{} {}'.format(idx, np.prod(list(response.shape)))
 
     # Correct the response accordingly
     if vtype == 'light':
@@ -73,12 +165,12 @@ def v2_sq_vesselness(image, ves, nsample=10, vtype='light', mask=None, percentil
     elif vtype == 'dark':
         response = -response
     elif vtype == 'both':
-        response = torch.abs(response)
+        response = 2*torch.abs(response)
     else:
         raise NotImplementedError('{} type not supported in vesseltype'.format(vtype))
 
     # We got the response, now subtract from mean and multiply with optional mask
-    response = response - response.min()
+    response = response - response.min().detach()
     if mask is not None:
         response = response * mask
     return response
@@ -139,6 +231,9 @@ def resample_from_flow_2d(image, flow):
     '''
     Given an image and flow vector, get the new image
     '''
+    if type(flow) in [int, float] and flow == 0:
+        return image
+
     B, C, H, W = image.shape
     # Resize this grid to [H, W] boundaries
     xx, yy = get_grid(image)
@@ -273,7 +368,7 @@ def vessel_loss_2d_dampen(output, data, config):
 
     # Add extra parameters -> length and matching of template profile
     l_template = args.get('lambda_template')
-    num_samples_template = args.get('num_samples_template', 10)
+    num_samples_template = args.get('num_samples_template', 12)
     l_perlength = args.get('lambda_perlength')
     detach = args.get('detach', True)
     # This parameter is for type of vessel
@@ -387,7 +482,12 @@ def vessel_loss_2d_dampen(output, data, config):
     return loss
 
 
-def vessel_loss_2d_sq(output, data, config):
+
+def vessel_loss_2d_sqmax(output, data, config):
+    return vessel_loss_2d_sq(output, data, config, maxfilter=True)
+
+
+def vessel_loss_2d_sq(output, data, config, maxfilter=False):
     '''
     Master loss function of vessel self supervised learning
     '''
@@ -406,7 +506,7 @@ def vessel_loss_2d_sq(output, data, config):
 
     # Add extra parameters -> length and matching of template profile
     l_template = args.get('lambda_template')
-    num_samples_template = args.get('num_samples_template', 10)
+    num_samples_template = args.get('num_samples_template', 12)
     l_perlength = args.get('lambda_perlength')
     detach = args.get('detach', True)
     # This parameter is for type of vessel
@@ -416,6 +516,12 @@ def vessel_loss_2d_sq(output, data, config):
     l_followupv = args.get('lambda_followupv')
 
     parallel_scale = args.get('parallel_scale', 2)
+
+    # Check for max filter
+    if maxfilter == False:
+        vesselnessfun = v2_sq_vesselness
+    else:
+        vesselnessfun = v2_sqmax_vesselness
 
     # check if we want to minimize cross correlation
     is_crosscorr = args.get('is_crosscorr', False)
@@ -475,14 +581,14 @@ def vessel_loss_2d_sq(output, data, config):
         # Check profile by taking convolution with the template [-1 -1 1 1 1 1 -1 -1]
         vessel_conv = 0.0
         if l_template:
-            vessel_conv = v2_sq_vesselness(image, v2, num_samples_template, vessel_type, is_crosscorr=is_crosscorr, parallel_scale=parallel_scale)
+            vessel_conv = vesselnessfun(image, v2, num_samples_template, vessel_type, is_crosscorr=is_crosscorr, parallel_scale=parallel_scale)
             loss = loss + l_template * (1 - (mask*vessel_conv).mean())
 
         # Check for vesselness in followup
         if l_followupv and l_template:
             # we have already calculated the vesselness
             followup_vessel = resample_from_flow_2d(vessel_conv, v1)
-            loss = loss + l_followupv * (1 - (mask*followup_vessel).mean()/num_samples_template)
+            loss = loss + l_followupv * (1 - (mask*followup_vessel).mean())
 
     else:
         raise NotImplementedError
@@ -646,3 +752,268 @@ def get_cross_corr(p1, p2):
     corr = (p1 - m1)*(p2 - m2)/s1/s2
     corr = corr.mean(1)
     return corr
+
+
+"""
+####################################################################################
+HERE IS THE CURVED LOSS
+####################################################################################
+"""
+# Output vesselness over variational filters
+def v2_curved_vesselness(image, ves, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1=None, parallel_scale=(4, 10)):
+    response = 0.0
+    i_range = []
+
+    # Parallel direction
+    v1 = ves*0
+    sign = 2*(v1[:, 0] >= 0) - 1
+    sign = sign.detach()
+    v1[:, 1] = ves[:, 0] * sign
+    v1[:, 0] = -ves[:, 1] * sign
+
+    # Perpendicular direction
+    v2 = ves
+
+    # The parallel scale is a two-pair of scale and nsample
+    p_totalscale, p_sample = parallel_scale
+    p_scale = p_totalscale*1.0/p_sample
+
+    cur_v1 = 0
+    for i in range(p_sample):
+        # sample v1 at appropriate location
+        cur_v2 = resample_from_flow_2d(v2, cur_v1)
+        # Calculate vesselness at this profile
+        for s in np.linspace(-2, 2, nsample):
+            filt = 2*int(abs(s) <= 1) - 1
+            i_val = resample_from_flow_2d(image, cur_v1 + s*cur_v2)
+            if is_crosscorr:
+                i_range.append(i_val.detach()[:, None])
+            # Compute response
+            response = response + (i_val*filt)
+
+        # Compute next v1
+        next_v1 = resample_from_flow_2d(v1, cur_v1)
+        # Update the v1 direction
+        cur_v1 = cur_v1 + p_scale*next_v1
+
+    # Take mean of response
+    response = response/(nsample*p_sample)
+    # Normalize
+    if is_crosscorr:
+        i_range = torch.cat(i_range, 1)   # [B, 20, 1, H, W]
+        i_std = i_range.std(1, unbiased=False) + 1e-5    # [B, 1, H, W]
+        response = response / i_std
+
+        # Check assertion
+        idx = (-1 <= response)*(response <= 1)
+        idx = (~idx).sum().item()
+        assert idx == 0, '{} {}'.format(idx, np.prod(list(response.shape)))
+
+    # Correct the response accordingly
+    if vtype == 'light':
+        pass
+    elif vtype == 'dark':
+        response = -response
+    elif vtype == 'both':
+        response = torch.abs(response)
+    else:
+        raise NotImplementedError('{} type not supported in vesseltype'.format(vtype))
+
+    # We got the response, now subtract from mean and multiply with optional mask
+    response = response - response.min().detach()
+    if mask is not None:
+        response = response * mask
+    return response
+
+
+
+# Auxiliary class for actually calculating the ODE
+class ODEVesselness(nn.Module):
+    def __init__(self, v1, v2, image, is_crosscorr, nsample=12):
+        super().__init__()
+        self.v1 = v1
+        self.v2 = v2
+        self.image = image
+        self.is_crosscorr = is_crosscorr
+        self.nsample = nsample
+
+    def forward(self, t, data):
+        # Data is of size [B, 3, H, W] where first channel is vesselness, other 2 channels are x, y
+        v = data[:, :1]
+        x = data[:, 1:]
+        # Calculate the derivatives based on displacement
+        v2_x = resample_from_flow_2d(self.v2, x)
+        irange1 = []
+        irange2 = []
+        res1, res2 = 0, 0
+        D = 0
+        # Calculate response
+        for s in np.linspace(-2, 2, self.nsample):
+            filt = 2*int(abs(s) < 1) - 1
+            D += filt
+            i_val = resample_from_flow_2d(self.image, s*v2_x + x)
+            if s < 0:
+                i_range1.append(i_val.detach()[:, None])
+            else:
+                i_range2.append(i_val.detach()[:, None])
+            # Compute the convolution I * f
+            if s < 0:
+                res1 = res1 + (i_val * filt)
+            else:
+                res2 = res2 + (i_val * filt)
+
+        assert D == 0
+        # Currently only using dark vessels
+        if self.is_crosscorr:
+            i_range1 = torch.cat(i_range1, 1)
+            i_range2 = torch.cat(i_range2, 1)
+            i_std1 = i_range1.std(1) + 1e-5
+            i_std2 = i_range2.std(1) + 1e-5
+            res1 = res1 / i_std1
+            res2 = res2 / i_std2
+
+        res = torch.min(-res1, -res2)
+        # Calculate rate of change of x, given by v1 at that location
+        v1_x = resample_from_flow_2d(self.v1, x)
+        dx = torch.cat([res, v1_x], 1)
+        return dx
+
+
+def v2_ode_vesselness(image, ves, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1=None, parallel_scale=(4, 50)):
+    # Use odeint library
+    v2 = ves
+    v1 = ves*0
+    v1[:, 0] = -ves[:, 1] + 0
+    v1[:, 1] =  ves[:, 0] + 0
+    # Modify sign
+    sign = 2*(v1[:, :1].detach() > 0) - 1
+    v1 = v1 * sign
+
+    # Given v1, we can use it to move along
+    func = ODEVesselness(v1, v2, image, is_crosscorr, nsample)
+    Nscale, timestep = parallel_scale
+    B, _, H, W = image.shape
+    vxy_0 = torch.zeros((B, 3, H, W)).to(image.device)
+    vxy_t1 = odeint(func, vxy_0, torch.linspace(0, Nscale, timestep))  # Going forwards
+    vxy_t2 = odeint(func, vxy_0, torch.linspace(0, -Nscale, timestep))  # Going backwards, note that this vesselness will be negative
+    v1 = vxy_t1[-1, :, :1]
+    v2 = -vxy_t2[-1, :, :1]
+    v = (v1 + v2)/2.0
+    v = v - v.min().detach()
+    if mask is not None:
+        v = v * mask
+    return v
+
+
+####
+## CURVED VESSEL LOSS FUNCTIONS
+####
+
+
+def vessel_loss_2d_ode(output, data, config):
+    return vessel_loss_2d_curved(output, data, config, ode=True)
+
+
+# Now the actual loss which uses the vesselness
+def vessel_loss_2d_curved(output, data, config, ode=False):
+    '''
+    Master loss function of vessel self supervised learning
+    '''
+    args = config['loss_args']
+    # Get all parameters
+    num_dir = args['num_directions'] # Determine the directions
+    unc = args['uncertainty'] # whether to use kappa uncertainty
+    eps = args['eps']
+    L_loss = LOSS_FNs[args['loss_intensity']]
+    # Weights for different parts of total loss
+    l_intensity = args.get('lambda_intensity')
+    l_consistency = args.get('lambda_consistency')
+    l_cosine = args.get('lambda_cosine')
+    l_decoder = args.get('lambda_decoder')
+    l_length = args.get('lambda_length')
+
+    # Add extra parameters -> length and matching of template profile
+    l_template = args.get('lambda_template')
+    num_samples_template = args.get('num_samples_template', 12)
+    l_perlength = args.get('lambda_perlength')
+    detach = args.get('detach', True)
+    # This parameter is for type of vessel
+    vessel_type = config.get('vessel_type', 'light') # should be light, dark or both
+
+    # parameter for followup vesselness
+    l_followupv = args.get('lambda_followupv')
+
+    parallel_scale = args.get('parallel_scale')
+
+    # check if we want to minimize cross correlation
+    is_crosscorr = args.get('is_crosscorr', False)
+    if not ode:
+        v2func = v2_curved_vesselness
+    else:
+        v2func = v2_ode_vesselness
+
+    # Get outputs and inputs
+    recon = output['recon']
+    vessel = output['vessel']
+    image = data['image']
+
+    # Take mask for all losses
+    mask = data.get('mask', 1)
+    if not args.get('use_mask', False):
+        mask = 1
+
+    # Now use the losses given in the config
+    if num_dir == 2 and not unc:
+        assert config['arch']['args']['out_channels'] == 4, 'Model with 2 directions and no uncertainty'
+        # parameters are v1, v2
+        loss = 0.0
+        v1 = vessel[:, :2]
+        v2 = vessel[:, 2:]
+        # Intensity consistency loss
+        if l_intensity:
+            for scale in [0.2, 0.4, 0.6, 0.8, 1]:
+                # Check for both directions for same intensity -> this will help in centerline prediction
+                i_parent = resample_from_flow_2d(image, scale*v1)
+                i_child = resample_from_flow_2d(image, scale*v2)
+                i_child2 = resample_from_flow_2d(image, -scale*v2)
+                L_childloss = torch.max(L_loss(image, i_child, mask=mask), L_loss(image, i_child2, mask=mask))
+                # add parent and child loss
+                # Add that loss
+                loss = loss + l_intensity * (L_loss(image, i_parent, mask=mask) + L_childloss)/5.0
+
+        # Flow consistency loss
+        if l_consistency:
+            # If v1, v2 are supposed to be opposite directions
+            loss = loss + l_consistency * L2(flow_consistency_2d(v1, -v1), mask=mask)
+
+        # Check for cosine similarity
+        if l_cosine:
+            loss = loss + l_cosine * torch.abs(mask * F.cosine_similarity(v1, v2)[:, None]).mean()
+
+        # Check for decoder
+        if l_decoder:
+            loss = loss + l_decoder * L2(image, recon, mask=1)
+
+        # Check for length of vector
+        if l_length:
+            v1norm = torch.sqrt((v1**2).sum(1) + eps)[:, None]
+            loss = loss + l_length * L1(1./v1norm, mask=mask)
+
+        # Check for length of vector for perpendicular line
+        if l_perlength:
+            v2norm = torch.sqrt((v2**2).sum(1) + eps)[:, None]
+            loss = loss + l_perlength * L1(v2norm, mask=mask)
+
+        # Check profile by taking convolution with the template [-1 -1 1 1 1 1 -1 -1]
+        vessel_conv = 0.0
+        if l_template:
+            vessel_conv = v2func(image, v2, num_samples_template, vessel_type, is_crosscorr=is_crosscorr, parallel_scale=parallel_scale)
+            loss = loss + l_template * (1 - (mask*vessel_conv).mean())
+
+    else:
+        raise NotImplementedError
+
+    # Return loss
+    return loss
+
+

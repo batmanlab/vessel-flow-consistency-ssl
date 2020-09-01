@@ -8,6 +8,7 @@ from matplotlib import pyplot as plt
 import pickle as pkl
 import model.metric as module_metric
 import model.model as module_arch
+from scipy.ndimage import gaussian_filter
 from parse_config import ConfigParser
 from utils import dir2flow_2d, v2vesselness, v2transpose_vesselness, overlay, overlay_quiver
 from utils.util import *
@@ -18,7 +19,17 @@ def to_device(data, device):
     return data
 
 
-def main(config):
+def smooth(ves):
+    # image = [B, C, H, W]
+    smoothves = ves * 0
+    B, C, H, W = ves.shape
+    for b in range(B):
+        for c in range(C):
+            smoothves[b, c] = gaussian_filter(ves[b, c], sigma=0.7)
+    return smoothves
+
+
+def main(config, args):
     logger = config.get_logger('test')
 
     # setup data_loader instances
@@ -39,11 +50,23 @@ def main(config):
         vesselfunc = v2_sq_vesselness
     elif config.config['loss'] == 'vessel_loss_2d_path':
         vesselfunc = v2_path_vesselness
-    else:
+    elif config['loss'] == 'vessel_loss_2d_dampen':
         vesselfunc = v2vesselness
+    elif config['loss'] == 'vessel_loss_2d_curved':
+        vesselfunc = v2_curved_vesselness
+    elif config['loss'] == 'vessel_loss_2d_sqmax':
+        vesselfunc = v2_sqmax_vesselness
+    else:
+        assert False, 'Unknown loss function {}'.format(config['loss'])
 
+    ## Check with curved vesselness
+    # vesselfunc = v2_curved_vesselness
+    # parallel_scale = [10, 10]
+
+    parallel_scale = config.config['loss_args'].get('parallel_scale', 2)
     # build model architecture
     model = config.init_obj('arch', module_arch)
+    model.eval()
     logger.info(model)
 
     # get function handles of loss and metrics
@@ -83,8 +106,9 @@ def main(config):
             if mask is not None:
                 mask = mask.cpu()
 
-            ves = vesselfunc(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, mask=mask, is_crosscorr=True)
+            ves = vesselfunc(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, mask=mask, is_crosscorr=args.crosscorr, parallel_scale=parallel_scale)
             ves = ves.data.cpu().numpy()
+            ves = smooth(ves)
 
             # Add the other frangi-like term
             '''
@@ -119,6 +143,8 @@ if __name__ == '__main__':
     args.add_argument('-d', '--device', default=None, type=str,
                       help='indices of GPUs to enable (default: all)')
     args.add_argument('--run_id', default='test')
+    args.add_argument('--crosscorr', default=1, type=int)
 
     config = ConfigParser.from_args(args)
-    main(config)
+    args = args.parse_args()
+    main(config, args)

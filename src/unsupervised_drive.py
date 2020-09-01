@@ -11,6 +11,7 @@ import cv2
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--method', type=str, default='frangi')
+parser.add_argument('--negate', type=int, default=0)
 parser.add_argument('--file', type=str, default='vesselness.pkl')
 
 def frangi_vesselness(img, i):
@@ -30,7 +31,8 @@ def vesselness_file(filename):
         #return data[i, 0]
         #img = cv2.medianBlur(data[i, 0], 5)
         #return img
-        return -data[i, 0]
+        V = data[i, 0]
+        return V
     return v
 
 
@@ -45,7 +47,7 @@ def get_vesselness(args):
         raise NotImplementedError
 
 
-def AUC(ves, gt, num=1000):
+def AUCa(ves, gt, num=1000):
     tpr_list = []
     fpr_list = []
     pos = gt.mean()
@@ -112,14 +114,16 @@ def main():
         mask = dataset[i]['mask'][0].data.cpu().numpy()
         # Get vesselness
         ves = vfunc(img, i)
+        if args.negate:
+            ves = -ves
         ves = multiply_mask(ves, mask)
         plt.imshow(ves)
         plt.savefig('label.png')
         auc = AUC(ves, lab)
         all_auc.append(auc)
-        print(auc)
+        #print(auc)
         #break
-    print("Method: {}, mean AUC: {}, std AUC: {}".format(args.method, np.mean(all_auc), np.std(all_auc)))
+    print("Method: {}, mean AUC: {}, std AUC: {}".format(args.method, np.mean(all_auc), np.std(all_auc)**2))
 
 
 if __name__ == '__main__':

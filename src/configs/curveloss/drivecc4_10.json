@@ -1,18 +1,17 @@
 {
-    "name": "drivesq8_minscale1",
+    "name": "drivecc4_10",
     "n_gpu": 2,
     "arch": {
         "type": "UNet",
         "args": {
             "inp_channels": 1,
             "out_channels": 4,
-            "min_scale": 0.5,
-            "vessel_scale_factor": 7.5
+            "vessel_scale_factor": 8
         }
     },
     "log_dir": "/pghbio/dbmi/batmanlab/rohit33/saved_models",
     "data_loader": {
-        "type": "DRIVEDataLoader",
+        "type": "DRIVEContrastDataLoader",
         "args": {
             "data_dir": "/pghbio/dbmi/batmanlab/rohit33/DRIVE/",
             "batch_size": 4,
@@ -27,11 +26,11 @@
         "type": "Adam",
         "args":{
             "lr": 0.001,
-            "weight_decay": 0,
+            "weight_decay": 1e-5,
             "amsgrad": true
         }
     },
-    "loss": "vessel_loss_2d_sq",
+    "loss": "vessel_loss_2d_curved",
     "loss_args": {
         "num_directions": 2,
         "eps": 1e-1,
@@ -43,7 +42,8 @@
         "lambda_decoder": 1,
         "lambda_length": 1,
         "lambda_template": 5,
-        "is_crosscorr": true,
+        "parallel_scale": [4, 10],
+        "is_crosscorr": false,
         "use_mask": true,
         "detach": true,
         "num_samples_template": 12,

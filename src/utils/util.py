@@ -12,7 +12,7 @@ import io
 from PIL import Image
 from skimage.color import hsv2rgb
 from skimage import color
-from model.loss import resample_from_flow_2d, v2vesselness, v2_sq_vesselness, v2_path_vesselness
+from model.loss import *
 import string
 
 ALPHABET = np.array(list(string.ascii_lowercase))
