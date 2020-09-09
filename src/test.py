@@ -19,13 +19,17 @@ def to_device(data, device):
     return data
 
 
-def smooth(ves):
+def smooth(ves, s=0.7):
     # image = [B, C, H, W]
     smoothves = ves * 0
     B, C, H, W = ves.shape
     for b in range(B):
         for c in range(C):
-            smoothves[b, c] = gaussian_filter(ves[b, c], sigma=0.7)
+            if isinstance(ves, torch.Tensor):
+                sm = gaussian_filter(ves[b, c].data.numpy(), sigma=s)
+                smoothves[b, c] = torch.Tensor(sm)
+            else:
+                smoothves[b, c] = gaussian_filter(ves[b, c], sigma=s)
     return smoothves
 
 
@@ -106,7 +110,13 @@ def main(config, args):
             if mask is not None:
                 mask = mask.cpu()
 
-            ves = vesselfunc(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, mask=mask, is_crosscorr=args.crosscorr, parallel_scale=parallel_scale)
+            v2 = output['vessel'][:, 2:4].cpu()
+            ves = vesselfunc(data['image'].cpu(), v2, vtype=vessel_type, mask=mask, is_crosscorr=args.crosscorr, parallel_scale=parallel_scale)
+
+            #ves = vesselfunc(data['image'].cpu(), v2, vtype=vessel_type, mask=mask, is_crosscorr=True, parallel_scale=parallel_scale)
+            #ves = smooth(ves)
+            #ves = vesselfunc(ves, v2, vtype='light', mask=mask, is_crosscorr=False, parallel_scale=parallel_scale)
+
             ves = ves.data.cpu().numpy()
             ves = smooth(ves)
 

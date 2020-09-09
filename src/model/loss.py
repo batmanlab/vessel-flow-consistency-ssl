@@ -881,7 +881,7 @@ class ODEVesselness(nn.Module):
 
 
 def v2_ode_vesselness(image, ves, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1=None, parallel_scale=(4, 50)):
-    # Use odeint library
+    # Use ode library
     v2 = ves
     v1 = ves*0
     v1[:, 0] = -ves[:, 1] + 0
@@ -895,8 +895,8 @@ def v2_ode_vesselness(image, ves, nsample=12, vtype='light', mask=None, percenti
     Nscale, timestep = parallel_scale
     B, _, H, W = image.shape
     vxy_0 = torch.zeros((B, 3, H, W)).to(image.device)
-    vxy_t1 = odeint(func, vxy_0, torch.linspace(0, Nscale, timestep).to(image.device))  # Going forwards
-    vxy_t2 = odeint(func, vxy_0, torch.linspace(0, -Nscale, timestep).to(image.device))  # Going backwards, note that this vesselness will be negative
+    vxy_t1 = odeint(func, vxy_0, torch.linspace(0, Nscale, 2).to(image.device), rtol=1e-2)  # Going forwards
+    vxy_t2 = odeint(func, vxy_0, torch.linspace(0, -Nscale, 2).to(image.device), rtol=1e-2)  # Going backwards, note that this vesselness will be negative
     v1 = vxy_t1[-1, :, :1]
     v2 = -vxy_t2[-1, :, :1]
     v = (v1 + v2)/2.0
