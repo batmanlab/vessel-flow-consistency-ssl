@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -514,6 +515,7 @@ def vessel_loss_2d_sq(output, data, config, maxfilter=False):
 
     # parameter for followup vesselness
     l_followupv = args.get('lambda_followupv')
+    l_mi = args.get('lambda_mi')
 
     parallel_scale = args.get('parallel_scale', 2)
 
@@ -589,6 +591,11 @@ def vessel_loss_2d_sq(output, data, config, maxfilter=False):
             # we have already calculated the vesselness
             followup_vessel = resample_from_flow_2d(vessel_conv, v1)
             loss = loss + l_followupv * (1 - (mask*followup_vessel).mean())
+
+        # Also check for mutual information
+        if l_mi:
+            mi = mutualinformation(image, vessel_conv, mask)
+            loss = loss + (-mi)*l_mi
 
     else:
         raise NotImplementedError
@@ -1016,5 +1023,51 @@ def vessel_loss_2d_curved(output, data, config, ode=False):
 
     # Return loss
     return loss
+
+
+def mutualinformation(image, ves, mask=None, bins=None, sigma_factor=0.5, epsilon=1e-5):
+    # Global mutual information
+    if bins is None:
+        bins = np.linspace(-1, 1, 20)
+    # Get number of bins, sigma and normalizer
+    numbins = len(bins)
+    sigma = np.mean(np.diff(bins)) * sigma_factor
+    preterm = 1./2/sigma**2
+
+    # Convert to torch tensor
+    bins = torch.FloatTensor(bins).to(image.device)[None]  # [1, B]
+
+    mi = 0.0
+    B, C, H, W = image.shape
+    if mask is not None:
+        # take each image and vessel with mask
+        for i in range(B):
+            c, y, x = torch.where(mask[i] > 0.5)
+            img = image[i, c, y, x][:, None]         # [HW, 1]
+            v = ves[i, c, y, x][:, None]             # [HW, 1]
+
+            # Given these, find p(a) and p(b)
+            pa = torch.exp(preterm * (img - bins)**2)   # [HW, B]
+            pa = pa / pa.sum(-1, keepdims=True)
+
+            pb = torch.exp(preterm * (v - bins)**2)   # [HW, B]
+            pb = pb / pb.sum(-1, keepdims=True)
+
+            # Get p(a, b)
+            pab = torch.mm(pa.T, pb)  # [B, B]
+            pab = pab/pa.shape[0]
+
+            pa = pa.mean(0, keepdims=True)  #[1, B]
+            pb = pb.mean(0, keepdims=True)  #[1, B]
+            papb = torch.mm(pa.T, pb) + epsilon #[B, B]
+            _mival = torch.sum(pab * torch.log(epsilon + pab/papb))
+            mi = mi + _mival
+
+        mi = mi/B
+        return mi
+    else:
+        raise NotImplementedError
+
+
 
 
