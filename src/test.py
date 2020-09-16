@@ -12,6 +12,7 @@ from scipy.ndimage import gaussian_filter
 from parse_config import ConfigParser
 from utils import dir2flow_2d, v2vesselness, v2transpose_vesselness, overlay, overlay_quiver
 from utils.util import *
+from model.loss import v2_avg
 
 def to_device(data, device):
     for k, v in data.items():
@@ -111,14 +112,18 @@ def main(config, args):
                 mask = mask.cpu()
 
             v2 = output['vessel'][:, 2:4].cpu()
-            ves = vesselfunc(data['image'].cpu(), v2, vtype=vessel_type, mask=mask, is_crosscorr=args.crosscorr, parallel_scale=parallel_scale)
 
-            #ves = vesselfunc(data['image'].cpu(), v2, vtype=vessel_type, mask=mask, is_crosscorr=True, parallel_scale=parallel_scale)
-            #ves = smooth(ves)
-            #ves = vesselfunc(ves, v2, vtype='light', mask=mask, is_crosscorr=False, parallel_scale=parallel_scale)
+            # Change this for different vesselness modes
+            if True:
+                ves = vesselfunc(data['image'].cpu(), v2, vtype=vessel_type, mask=mask, is_crosscorr=args.crosscorr, parallel_scale=parallel_scale)
+                ves = ves.data.cpu().numpy()
+                ves = smooth(ves)
+            else:
+                ves = vesselfunc(data['image'].cpu(), v2, vtype=vessel_type, mask=mask, is_crosscorr=False, parallel_scale=parallel_scale)
+                ves = smooth(ves)
+                ves = v2_avg(ves, v2, vtype='light', mask=mask, is_crosscorr=False, parallel_scale=parallel_scale)
+                ves = ves.data.cpu().numpy()
 
-            ves = ves.data.cpu().numpy()
-            ves = smooth(ves)
 
             # Add the other frangi-like term
             '''

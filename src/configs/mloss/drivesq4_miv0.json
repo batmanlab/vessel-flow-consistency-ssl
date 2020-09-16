@@ -1,5 +1,5 @@
 {
-    "name": "drivesq4",
+    "name": "drivesq4_miv0",
     "n_gpu": 2,
     "arch": {
         "type": "UNet",
@@ -48,7 +48,8 @@
         "detach": true,
         "num_samples_template": 12,
         "lambda_followupv": 0,
-        "lambda_perlength": 0.1
+        "lambda_perlength": 0.1,
+        "lambda_mi": 1
     },
     "metrics": [
         "recon_error_l2"

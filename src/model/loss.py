@@ -45,6 +45,60 @@ def v2vesselness(image, ves, nsample=20, vtype='light', mask=None, percentile=10
         response = response * mask
     return response
 
+
+
+
+def v2_avg(image, ves, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2):
+    response1 = 0.0
+    response2 = 0.0
+    i_range1 = []
+    i_range2 = []
+
+    v1 = ves*0
+    v1[:, 1] = ves[:, 0]
+    v1[:, 0] = -ves[:, 1]
+
+    D = 0
+    for sv in np.linspace(-parallel_scale, parallel_scale, nsample):
+        # Get perp profile
+        for s in np.linspace(-1, 1, nsample):
+            filt = 1
+            D += filt
+            i_val = resample_from_flow_2d(image, s*ves + sv*v1)
+            if is_crosscorr:
+                if s < 0:
+                    i_range1.append(i_val.detach()[:, None])
+                else:
+                    i_range2.append(i_val.detach()[:, None])
+            # Compute the convolution I * f
+            if s < 0:
+                response1 = response1 + (i_val * filt)
+            else:
+                response2 = response2 + (i_val * filt)
+
+    response = response1 + response2
+    # Normalize
+    # Correct the response accordingly
+    if vtype == 'light':
+        pass
+    elif vtype == 'dark':
+        response = -response
+    elif vtype == 'both':
+        response = 2*torch.abs(response)
+    else:
+        raise NotImplementedError('{} type not supported in vesseltype'.format(vtype))
+
+    # We got the response, now subtract from mean and multiply with optional mask
+    response = response - response.min().detach()
+    if mask is not None:
+        response = response * mask
+    return response
+
+
+
+
+
+
 def v2_sqmax_vesselness(image, ves, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2):
     response1 = 0.0
     response2 = 0.0
@@ -1025,13 +1079,13 @@ def vessel_loss_2d_curved(output, data, config, ode=False):
     return loss
 
 
-def mutualinformation(image, ves, mask=None, bins=None, sigma_factor=0.5, epsilon=1e-5):
+def mutualinformation(image, ves, mask=None, bins=None, sigma_factor=0.5, epsilon=0):
     # Global mutual information
     if bins is None:
         bins = np.linspace(-1, 1, 20)
     # Get number of bins, sigma and normalizer
     numbins = len(bins)
-    sigma = np.mean(np.diff(bins)) * sigma_factor
+    sigma = np.mean(np.abs(np.diff(bins))) * sigma_factor
     preterm = 1./2/sigma**2
 
     # Convert to torch tensor
@@ -1047,10 +1101,10 @@ def mutualinformation(image, ves, mask=None, bins=None, sigma_factor=0.5, epsilo
             v = ves[i, c, y, x][:, None]             # [HW, 1]
 
             # Given these, find p(a) and p(b)
-            pa = torch.exp(preterm * (img - bins)**2)   # [HW, B]
+            pa = 1e-10 + torch.exp(-preterm * (img - bins)**2)   # [HW, B]
             pa = pa / pa.sum(-1, keepdims=True)
 
-            pb = torch.exp(preterm * (v - bins)**2)   # [HW, B]
+            pb = 1e-10 + torch.exp(-preterm * (v - bins)**2)   # [HW, B]
             pb = pb / pb.sum(-1, keepdims=True)
 
             # Get p(a, b)
