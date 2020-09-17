@@ -51,6 +51,8 @@ class VesselTrainer(BaseTrainer):
             self.vesselfunc = v2_ode_vesselness
         elif self.config['loss'] == 'vessel_loss_2d_sqmax':
             self.vesselfunc = v2_sqmax_vesselness
+        elif self.config['loss'] == 'vessel_loss_2dv1_sqmax':
+            self.vesselfunc = v1_sqmax_vesselness
         else:
             assert False, 'Unknown loss function {}'.format(self.config['loss'])
 
@@ -88,15 +90,15 @@ class VesselTrainer(BaseTrainer):
             self.optimizer.step()
 
             self.writer.set_step((epoch - 1) * self.len_epoch + batch_idx)
-            self.train_metrics.update('loss', loss.item())
+            self.train_metrics.update('loss', loss.detach().item())
             for met in self.metric_ftns:
-                self.train_metrics.update(met.__name__, met(output, data))
+                self.train_metrics.update(met.__name__, met(output, data).detach())
 
             if batch_idx % self.log_step == 0:
                 self.logger.debug('Train Epoch: {} {} Loss: {:.6f}'.format(
                     epoch,
                     self._progress(batch_idx),
-                    loss.item()))
+                    loss.detach().item()))
 
             # Get vessel type here
             vessel_type = self.config.get('vessel_type', 'light')
@@ -107,23 +109,23 @@ class VesselTrainer(BaseTrainer):
 
             # Every few steps, add some images
             if epoch % self.img_log_step == 0 and batch_idx == 0:
-                self.writer.add_image('input', make_grid(0.5 + 0.5*data['image'].cpu(), nrow=4, normalize=True))
-                self.writer.add_image('recon', make_grid(0.5 + 0.5*output['recon'].cpu(), nrow=4, normalize=True))
-                self.writer.add_image('v_x', make_grid(output['vessel'][:, 0:1].cpu(), nrow=4, normalize=True))
-                self.writer.add_image('v_y', make_grid(output['vessel'][:, 1:2].cpu(), nrow=4, normalize=True))
+                self.writer.add_image('input', make_grid(0.5 + 0.5*data['image'].detach().cpu(), nrow=4, normalize=True))
+                self.writer.add_image('recon', make_grid(0.5 + 0.5*output['recon'].detach().cpu(), nrow=4, normalize=True))
+                self.writer.add_image('v_x', make_grid(output['vessel'][:, 0:1].detach().cpu(), nrow=4, normalize=True))
+                self.writer.add_image('v_y', make_grid(output['vessel'][:, 1:2].detach().cpu(), nrow=4, normalize=True))
                 #self.writer.add_image('flow', make_grid(dir2flow_2d(output['vessel'][:, 0:2].cpu()), nrow=4, normalize=True))
                 #self.writer.add_image('flow_rev', make_grid(dir2flow_2d(output['vessel'][:, 2:4].cpu(), ret_mag=True), nrow=4, normalize=True))
-                self.writer.add_image('flow', make_grid(overlay_quiver(data['image'].cpu(), output['vessel'][:, 0:2].cpu(), quiverscale, normflow), nrow=4, normalize=True))
-                self.writer.add_image('flow_rev', make_grid(overlay_quiver(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), quiverscale, normflowrev), nrow=4, normalize=True))
-                self.writer.add_image('v2_vesselness_only', make_grid(self.vesselfunc(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, \
-                        mask = mask, v1 = output['vessel'][:, :2].cpu(), parallel_scale=parallel_scale), nrow=4, normalize=True))
-                ves = self.vesselfunc(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, mask=mask, v1 = output['vessel'][:, :2].cpu(), parallel_scale=parallel_scale)
-                overlay_img = overlay(data['image'].cpu(), ves)
+                self.writer.add_image('flow', make_grid(overlay_quiver(data['image'].detach().cpu(), output['vessel'][:, 0:2].detach().cpu(), quiverscale, normflow), nrow=4, normalize=True))
+                self.writer.add_image('flow_rev', make_grid(overlay_quiver(data['image'].detach().cpu(), output['vessel'][:, 2:4].detach().cpu(), quiverscale, normflowrev), nrow=4, normalize=True))
+                self.writer.add_image('v2_vesselness_only', make_grid(self.vesselfunc(data['image'].detach().cpu(), output['vessel'][:, 2:4].detach().cpu(), vtype=vessel_type, \
+                        mask = mask, v1 = output['vessel'][:, :2].detach().cpu(), parallel_scale=parallel_scale), nrow=4, normalize=True))
+                ves = self.vesselfunc(data['image'].detach().cpu(), output['vessel'][:, 2:4].detach().cpu(), vtype=vessel_type, mask=mask, v1 = output['vessel'][:, :2].detach().cpu(), parallel_scale=parallel_scale)
+                overlay_img = overlay(data['image'].detach().cpu(), ves.data.detach().cpu())
                 self.writer.add_image('v2_vesselness_overlay', make_grid(overlay_img, nrow=4, normalize=True))
 
                 # Cross correlation vesselness
-                ves = self.vesselfunc(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, mask=mask, is_crosscorr=True, v1 = output['vessel'][:, :2].cpu(), parallel_scale=parallel_scale)
-                self.writer.add_image('v2_vesselness_crosscorr', make_grid(ves, nrow=4, normalize=True))
+                ves = self.vesselfunc(data['image'].detach().cpu(), output['vessel'][:, 2:4].detach().cpu(), vtype=vessel_type, mask=mask, is_crosscorr=True, v1 = output['vessel'][:, :2].detach().cpu(), parallel_scale=parallel_scale)
+                self.writer.add_image('v2_vesselness_crosscorr', make_grid(ves.data.detach().cpu(), nrow=4, normalize=True))
 
                 #print(output['vessel'].max(), output['vessel'].min())
 
@@ -168,7 +170,7 @@ class VesselTrainer(BaseTrainer):
                 self.writer.set_step((epoch - 1) * len(self.valid_data_loader) + batch_idx, 'valid')
                 self.valid_metrics.update('loss', loss.item())
                 for met in self.metric_ftns:
-                    self.valid_metrics.update(met.__name__, met(output, data))
+                    self.valid_metrics.update(met.__name__, met(output, data).detach())
 
                 # Get vessel mask
                 mask = data.get('mask')

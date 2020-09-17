@@ -13,11 +13,11 @@ def crop(ds, idx):
     if idx is not None:
         if type(idx) == int:
             idx = [idx]
-        print("Preserving indices: ", idx)            
+        print("Preserving indices: ", idx)
         ds.images = [ds.images[x] for x in idx]
         ds.masks  = [ds.masks[x] for x in idx]
         ds.seg    = [ds.seg[x] for x in idx]
-        
+
 
 class DriveDataset(Dataset):
 
@@ -46,10 +46,10 @@ class DriveDataset(Dataset):
             self.seg = map(lambda x: osp.join(r, x), filter(lambda x: x.endswith('gif'), images))
             self.seg = sorted(list(self.seg))
             break
-        
-        crop(self, idx) 
 
-        
+        crop(self, idx)
+
+
     def __len__(self,):
         if not self.augment:
             return len(self.images)
@@ -144,9 +144,9 @@ class DriveContrastDataset(Dataset):
             self.seg = map(lambda x: osp.join(r, x), filter(lambda x: x.endswith('gif'), images))
             self.seg = sorted(list(self.seg))
             break
-        
+
         crop(self, idx)
-         
+
 
     def __len__(self,):
         if not self.augment:
