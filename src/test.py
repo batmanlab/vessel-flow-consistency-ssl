@@ -38,6 +38,14 @@ def main(config, args):
     logger = config.get_logger('test')
 
     # setup data_loader instances
+    if "STARE" in args.dataset:
+        config['data_loader']['type'] = "STAREDataLoader"
+        config['data_loader']['args']['data_dir'] = config['data_loader']['args']['data_dir'].replace('DRIVE', 'STARE')
+
+
+    training = True if args.train else False
+    trainstr = "train" if args.train != 0 else "test"
+
     data_loader = getattr(module_data, config['data_loader']['type'])(
         config['data_loader']['args']['data_dir'],
         batch_size=512,
@@ -45,7 +53,7 @@ def main(config, args):
         toy=config['data_loader']['args']['toy'],
         preprocessing=config['data_loader']['args'].get('preprocessing'),
         validation_split=0.0,
-        training=True,
+        training=training,
         augment=False,
         num_workers=2
     )
@@ -61,8 +69,13 @@ def main(config, args):
         vesselfunc = v2_curved_vesselness
     elif config['loss'] == 'vessel_loss_2d_sqmax':
         vesselfunc = v2_sqmax_vesselness
+    elif config['loss'] == 'vessel_loss_2dv1_sqmax':
+        vesselfunc = v1_sqmax_vesselness
+    elif config['loss'] == 'vessel_loss_2dv1_sq':
+        vesselfunc = v1_sq_vesselness
     else:
         assert False, 'Unknown loss function {}'.format(config['loss'])
+    print(vesselfunc)
 
     ## Check with curved vesselness
     # vesselfunc = v2_curved_vesselness
@@ -133,11 +146,11 @@ def main(config, args):
             '''
 
             # computing loss, metrics on test set
-            with open('vesselness.pkl', 'wb') as fi:
+            with open('{}_vesselness.pkl'.format(trainstr), 'wb') as fi:
                 pkl.dump(ves, fi)
 
             # store everything in another pickle file
-            with open('analysis.pkl', 'wb') as fi:
+            with open('{}_analysis.pkl'.format(trainstr), 'wb') as fi:
                 torch.save({'data': data, 'output': output}, fi)
 
             I = np.random.randint(20)
@@ -159,6 +172,8 @@ if __name__ == '__main__':
                       help='indices of GPUs to enable (default: all)')
     args.add_argument('--run_id', default='test')
     args.add_argument('--crosscorr', default=1, type=int)
+    args.add_argument('--dataset', default="", type=str)
+    args.add_argument('--train', default=0, type=int)
 
     config = ConfigParser.from_args(args)
     args = args.parse_args()

@@ -1,3 +1,6 @@
+'''
+Use this script to generate threshold, and
+'''
 import torch
 import pickle as pkl
 import numpy as np
@@ -11,7 +14,6 @@ import cv2
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--method', type=str, default='frangi')
-parser.add_argument('--negate', type=int, default=0)
 parser.add_argument('--file', type=str, default='vesselness.pkl')
 parser.add_argument('--dataset', type=str, default='drive')
 
@@ -120,8 +122,6 @@ def main():
         mask = dataset[i]['mask'][0].data.cpu().numpy()
         # Get vesselness
         ves = vfunc(img, i)
-        if args.negate:
-            ves = -ves
         ves = multiply_mask(ves, mask)
         plt.imshow(ves)
         plt.savefig('label.png')

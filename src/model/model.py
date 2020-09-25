@@ -1,10 +1,11 @@
 import torch.nn as nn
 import torch.nn.functional as F
 from base import BaseModel
-from model.fcn32s import *
+from model._fcn32s import *
 from model.resnet import *
 from model.deepnets import *
 from model.unet import *
+from model.fcn3d import *
 from model.deeplabv3 import *
 
 class MnistModel(BaseModel):

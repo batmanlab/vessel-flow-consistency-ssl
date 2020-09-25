@@ -6,7 +6,17 @@ from utils import inf_loop, MetricTracker
 from utils import dir2flow_2d, v2vesselness, overlay, overlay_quiver
 from utils.util import *
 
-class VesselTrainer(BaseTrainer):
+def squeeze_batch(data):
+    # Squeeze the first and second indices into 1
+    for k, v in data.items():
+        shape = list(v.shape)
+        shape = [shape[0]*shape[1]] + shape[2:]
+        v = v.reshape(shape)
+        data[k] = v
+    return data
+
+
+class COPDTrainer(BaseTrainer):
     """
     Trainer class
     model: network architecture
@@ -29,6 +39,7 @@ class VesselTrainer(BaseTrainer):
             # iteration-based training
             self.data_loader = inf_loop(data_loader)
             self.len_epoch = len_epoch
+
         self.valid_data_loader = valid_data_loader
         self.do_validation = self.valid_data_loader is not None
         self.lr_scheduler = lr_scheduler
@@ -39,25 +50,11 @@ class VesselTrainer(BaseTrainer):
         self.valid_metrics = MetricTracker('loss', *[m.__name__ for m in self.metric_ftns], writer=self.writer)
 
         # Change v2vesselness function here
-        if self.config['loss'] == 'vessel_loss_2d_sq':
-            self.vesselfunc = v2_sq_vesselness
-        elif self.config['loss'] == 'vessel_loss_2d_path':
-            self.vesselfunc = v2_path_vesselness
-        elif self.config['loss'] == 'vessel_loss_2d_dampen':
-            self.vesselfunc = v2vesselness
-        elif self.config['loss'] == 'vessel_loss_2d_curved':
-            self.vesselfunc = v2_curved_vesselness
-        elif self.config['loss'] == 'vessel_loss_2d_ode':
-            self.vesselfunc = v2_ode_vesselness
-        elif self.config['loss'] == 'vessel_loss_2d_sqmax':
-            self.vesselfunc = v2_sqmax_vesselness
-        elif self.config['loss'] == 'vessel_loss_2dv1_sqmax':
-            self.vesselfunc = v1_sqmax_vesselness
-        elif self.config['loss'] == 'vessel_loss_2dv1_sq':
-            self.vesselfunc = v1_sq_vesselness
+        # TODO
+        if self.config['loss'] == 'vessel_loss_3d':
+            self.vesselfunc = v13d_sq_vesselness
         else:
-            assert False, 'Unknown loss function {}'.format(self.config['loss'])
-
+            self.vesselfunc = v13d_sqmax_vesselness
         print("Using vesselness function", self.vesselfunc)
 
     def _to_device(self, data):
@@ -75,16 +72,14 @@ class VesselTrainer(BaseTrainer):
         """
         # Get parameters for quiver
         params = self.config['trainer']
-        normflow = params.get('normalize_flow', True)
-        normflowrev = params.get('normalize_flow_rev', True)
-        quiverscale = params.get('quiver_scale', 2)
-
 
         self.model.train()
         self.train_metrics.reset()
         for batch_idx, data in enumerate(self.data_loader):
             # Move tensors to device
             data = self._to_device(data)
+            data = squeeze_batch(data)
+
             self.optimizer.zero_grad()
             output = self.model(data)
             loss = self.criterion(output, data, self.config)
@@ -111,6 +106,7 @@ class VesselTrainer(BaseTrainer):
 
             # Every few steps, add some images
             if epoch % self.img_log_step == 0 and batch_idx == 0:
+                """
                 self.writer.add_image('input', make_grid(0.5 + 0.5*data['image'].detach().cpu(), nrow=4, normalize=True))
                 self.writer.add_image('recon', make_grid(0.5 + 0.5*output['recon'].detach().cpu(), nrow=4, normalize=True))
                 self.writer.add_image('v_x', make_grid(output['vessel'][:, 0:1].detach().cpu(), nrow=4, normalize=True))
@@ -130,6 +126,8 @@ class VesselTrainer(BaseTrainer):
                 self.writer.add_image('v2_vesselness_crosscorr', make_grid(ves.data.detach().cpu(), nrow=4, normalize=True))
 
                 #print(output['vessel'].max(), output['vessel'].min())
+                """
+                pass
 
             if batch_idx == self.len_epoch:
                 break
@@ -152,9 +150,6 @@ class VesselTrainer(BaseTrainer):
         """
         # Get quiver params
         params = self.config['trainer']
-        normflow = params.get('normalize_flow', True)
-        normflowrev = params.get('normalize_flow_rev', True)
-        quiverscale = params.get('quiver_scale', 2)
 
         # Get vessel type here
         vessel_type = self.config.get('vessel_type', 'light')
@@ -166,6 +161,7 @@ class VesselTrainer(BaseTrainer):
             for batch_idx, data in enumerate(self.valid_data_loader):
                 # Move tensors to device
                 data = self._to_device(data)
+                data = squeeze_batch(data)
 
                 output = self.model(data)
                 loss = self.criterion(output, data, self.config)
@@ -180,6 +176,7 @@ class VesselTrainer(BaseTrainer):
                     mask = mask.cpu()
 
                 if epoch % self.img_log_step == 0 and batch_idx == 0:
+                    """
                     self.writer.add_image('input', make_grid(0.5 + 0.5*data['image'].cpu(), nrow=4, normalize=True))
                     self.writer.add_image('recon', make_grid(0.5 + 0.5*output['recon'].cpu(), nrow=4, normalize=True))
                     self.writer.add_image('v_x', make_grid(output['vessel'][:, 0:1].cpu(), nrow=4, normalize=True))
@@ -197,11 +194,14 @@ class VesselTrainer(BaseTrainer):
                     # Cross correlation vesselness
                     ves = self.vesselfunc(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, mask=mask, is_crosscorr=True, v1 = output['vessel'][:, :2].cpu(), parallel_scale=parallel_scale)
                     self.writer.add_image('v2_vesselness_crosscorr', make_grid(ves, nrow=4, normalize=True))
+                    """
+                    pass
 
         # add histogram of model parameters to the tensorboard
         for name, p in self.model.named_parameters():
             self.writer.add_histogram(name, p, bins='auto')
         return self.valid_metrics.result()
+
 
     def _progress(self, batch_idx):
         base = '[{}/{} ({:.0f}%)]'

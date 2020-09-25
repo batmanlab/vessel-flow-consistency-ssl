@@ -43,7 +43,7 @@ class DriveDataset(Dataset):
             break
 
         for r, dirs, images in os.walk(osp.join(self.data_dir, self.trainstr, '1st_manual')):
-            self.seg = map(lambda x: osp.join(r, x), filter(lambda x: x.endswith('gif'), images))
+            self.seg = map(lambda x: osp.join(r, x), images)
             self.seg = sorted(list(self.seg))
             break
 

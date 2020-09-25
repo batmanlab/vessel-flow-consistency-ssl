@@ -4,6 +4,7 @@ from torch import nn
 import torch.nn.functional as F
 import numpy as np
 from torchdiffeq import odeint_adjoint as odeint
+from model.copdloss import *
 
 def null_fn(*args):
     return None
@@ -1116,6 +1117,58 @@ def mutualinformation(image, ves, mask=None, bins=None, sigma_factor=0.5, epsilo
         raise NotImplementedError
 
 
+def v1_sq_vesselness(image, ves, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2):
+    response1 = 0.0
+    response2 = 0.0
+    i_range1 = []
+    i_range2 = []
+
+    v2 = ves*0
+    v2[:, 1] = ves[:, 0] + 0
+    v2[:, 0] = -ves[:, 1] + 0
+
+    D = 0
+    N = nsample*nsample
+
+    for sv in np.linspace(-parallel_scale, parallel_scale, nsample):
+        # Get perp profile
+        for s in np.linspace(-2, 2, nsample):
+            filt = 2*int(abs(s) < 1) - 1
+            D += filt
+            i_val = resample_from_flow_2d(image, sv*ves + s*v2)
+            if is_crosscorr:
+                if s < 0:
+                    i_range1.append(i_val.detach()[:, None])
+                else:
+                    i_range2.append(i_val.detach()[:, None])
+            # Compute the convolution I * f
+            if s < 0:
+                response1 = response1 + (i_val * filt)
+            else:
+                response2 = response2 + (i_val * filt)
+
+    response = response1 + response2
+    if is_crosscorr:
+        # Take min of both sides
+        i_range = torch.cat(i_range1 + i_range2, 1)
+        i_std = i_range.std(1, unbiased=True) + 1e-5
+        response = response / i_std / N
+
+    # Correct the response accordingly
+    if vtype == 'light':
+        pass
+    elif vtype == 'dark':
+        response = -response
+    elif vtype == 'both':
+        response = 2*torch.abs(response)
+    else:
+        raise NotImplementedError('{} type not supported in vesseltype'.format(vtype))
+
+    # We got the response, now subtract from mean and multiply with optional mask
+    if mask is not None:
+        response = response * mask
+    return response
+
 
 def v1_sqmax_vesselness(image, ves, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2):
     response1 = 0.0
@@ -1175,6 +1228,9 @@ def v1_sqmax_vesselness(image, ves, nsample=12, vtype='light', mask=None, percen
     return response
 
 
+def vessel_loss_2dv1_sq(output, data, config):
+    return vessel_loss_2dv1_sqmax(output, data, config, maxfilter=False)
+
 
 def vessel_loss_2dv1_sqmax(output, data, config, maxfilter=True):
     '''
@@ -1229,8 +1285,8 @@ def vessel_loss_2dv1_sqmax(output, data, config, maxfilter=True):
         # parameters are v1, v2
         loss = 0.0
         v1 = vessel[:, 2:4]
-        # Consistency loss
 
+        # Consistency loss
         if l_consistency:
             # Align v1 = v(x1) and v2 = v(x1 + v1) to be along same directions
             v1x = resample_from_flow_2d(v1+0, v1+0)
@@ -1258,7 +1314,7 @@ def vessel_loss_2dv1_sqmax(output, data, config, maxfilter=True):
             for scale in np.linspace(-parallel_scale/2., parallel_scale/2., 5):
                 # Check for both directions for same intensity -> this will help in centerline prediction
                 i_parent = resample_from_flow_2d(vessel_conv, scale*v1)
-                loss = loss + l_intensity * (L_loss(image, i_parent, mask=mask))/5.0
+                loss = loss + l_intensity * (L_loss(vessel_conv, i_parent, mask=mask))/5.0
 
     else:
         raise NotImplementedError

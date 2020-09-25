@@ -13,6 +13,7 @@ from PIL import Image
 from skimage.color import hsv2rgb
 from skimage import color
 from model.loss import *
+from model.copdloss import *
 import string
 
 ALPHABET = np.array(list(string.ascii_lowercase))

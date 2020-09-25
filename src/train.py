@@ -7,7 +7,7 @@ import model.loss as module_loss
 import model.metric as module_metric
 import model.model as module_arch
 from parse_config import ConfigParser
-from trainer import VesselTrainer
+from trainer import VesselTrainer, COPDTrainer
 
 
 # fix random seeds for reproducibility
@@ -40,12 +40,18 @@ def main(config):
     lr_scheduler = config.init_obj('lr_scheduler', torch.optim.lr_scheduler, optimizer)
 
     print(config)
-    trainer = VesselTrainer(model, criterion, metrics, optimizer,
-                      config=config,
-                      data_loader=data_loader,
-                      valid_data_loader=valid_data_loader,
-                      lr_scheduler=lr_scheduler)
-
+    if '3d' not in config['loss']:
+        trainer = VesselTrainer(model, criterion, metrics, optimizer,
+                          config=config,
+                          data_loader=data_loader,
+                          valid_data_loader=valid_data_loader,
+                          lr_scheduler=lr_scheduler)
+    else:
+        trainer = COPDTrainer(model, criterion, metrics, optimizer,
+                          config=config,
+                          data_loader=data_loader,
+                          valid_data_loader=valid_data_loader,
+                          lr_scheduler=lr_scheduler)
     trainer.train()
 
 

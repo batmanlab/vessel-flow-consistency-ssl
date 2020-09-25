@@ -28,6 +28,27 @@ class DRIVEDataLoader(BaseDataLoader):
         super().__init__(self.dataset, batch_size, shuffle, validation_split, num_workers)
 
 
+class COPDDataLoader(BaseDataLoader):
+    '''
+    Dataloader for COPD dataset
+    '''
+    def __init__(self, data_dir, batch_size, shuffle=True, validation_split=0.0, num_workers=1, training=True, augment=True, patientIDs=None):
+        self.data_dir = data_dir
+        self.dataset = COPDDataset(data_dir, train=training, patientIDs=patientIDs, minibatch=batch_size, augment=augment)
+        super().__init__(self.dataset, 1, shuffle, validation_split, num_workers)
+
+
+class STAREDataLoader(BaseDataLoader):
+    '''
+    Dataloader for DRIVE dataset
+    '''
+    def __init__(self, data_dir, batch_size, shuffle=True, validation_split=0.0, num_workers=1, training=True, toy=False, augment=True, preprocessing=False, idx=None):
+        self.data_dir = data_dir
+        self.dataset = StareDataset(self.data_dir, train=training, toy=toy, preprocessing=preprocessing, \
+                                    augment=augment, idx=idx)
+        super().__init__(self.dataset, batch_size, shuffle, validation_split, num_workers)
+
+
 class DRIVEContrastDataLoader(BaseDataLoader):
     '''
     Dataloader for DRIVE dataset

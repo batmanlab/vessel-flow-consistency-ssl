@@ -17,7 +17,7 @@
             "data_dir": "/pghbio/dbmi/batmanlab/rohit33/DRIVE/",
             "batch_size": 4,
             "shuffle": true,
-            "validation_split": 0.2,
+            "validation_split": 0,
             "num_workers": 4,
             "toy": false
         }
@@ -38,9 +38,10 @@
         "uncertainty": false,
         "loss_intensity": "L2",
         "lambda_template": 1,
-        "lambda_intensity": 1,
-        "lambda_cosine": 1,
-        "lambda_consistency": 0,
+        "lambda_intensity": 0.1,
+        "lambda_cosine": 0,
+        "lambda_consistency": 1,
+
         "lambda_decoder": 0,
         "is_crosscorr": true,
         "use_mask": true,
