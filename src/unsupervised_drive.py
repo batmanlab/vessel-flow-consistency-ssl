@@ -12,7 +12,7 @@ import cv2
 parser = argparse.ArgumentParser()
 parser.add_argument('--method', type=str, default='frangi')
 parser.add_argument('--negate', type=int, default=0)
-parser.add_argument('--file', type=str, default='vesselness.pkl')
+parser.add_argument('--file', type=str, default='test_vesselness.pkl')
 parser.add_argument('--dataset', type=str, default='drive')
 
 def frangi_vesselness(img, i):

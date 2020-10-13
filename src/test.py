@@ -70,9 +70,9 @@ def main(config, args):
     elif config['loss'] == 'vessel_loss_2d_sqmax':
         vesselfunc = v2_sqmax_vesselness
     elif config['loss'] == 'vessel_loss_2dv1_sqmax':
-        vesselfunc = v1_sqmax_vesselness
+        vesselfunc = v1_sqmax_vesselness_test
     elif config['loss'] == 'vessel_loss_2dv1_sq':
-        vesselfunc = v1_sq_vesselness
+        vesselfunc = v1_sq_vesselness_test
     else:
         assert False, 'Unknown loss function {}'.format(config['loss'])
     print(vesselfunc)

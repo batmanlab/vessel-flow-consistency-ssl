@@ -1117,6 +1117,24 @@ def mutualinformation(image, ves, mask=None, bins=None, sigma_factor=0.5, epsilo
         raise NotImplementedError
 
 
+def v1_sq_vesselness_test(image, ves, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2):
+    v = v1_sq_vesselness(image, ves, nsample, vtype, mask, percentile, is_crosscorr, v1, parallel_scale)
+    #v = torch.exp(v)
+
+    #### Additional dissimilarity
+    total_sim = 0.0
+    for sv in np.linspace(-parallel_scale*4, parallel_scale*4, nsample):
+        vt = resample_from_flow_2d(ves+0, sv*ves)
+        sim = (torch.abs(F.cosine_similarity(ves+0, vt)))
+        total_sim = total_sim + sim
+
+    total_sim = total_sim/nsample
+    total_sim = total_sim[:, None]
+
+    #return v + 0.05*total_sim
+    return v*total_sim
+
+
 def v1_sq_vesselness(image, ves, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2):
     response1 = 0.0
     response2 = 0.0
@@ -1148,11 +1166,14 @@ def v1_sq_vesselness(image, ves, nsample=12, vtype='light', mask=None, percentil
                 response2 = response2 + (i_val * filt)
 
     response = response1 + response2
+
     if is_crosscorr:
         # Take min of both sides
         i_range = torch.cat(i_range1 + i_range2, 1)
         i_std = i_range.std(1, unbiased=True) + 1e-5
         response = response / i_std / N
+    else:
+        response = response / N
 
     # Correct the response accordingly
     if vtype == 'light':
@@ -1168,6 +1189,24 @@ def v1_sq_vesselness(image, ves, nsample=12, vtype='light', mask=None, percentil
     if mask is not None:
         response = response * mask
     return response
+
+
+def v1_sqmax_vesselness_test(image, ves, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2):
+    v = v1_sqmax_vesselness(image, ves, nsample, vtype, mask, percentile, is_crosscorr, v1, parallel_scale)
+    #v = torch.exp(v)
+
+    #### Additional dissimilarity
+    total_sim = 0.0
+    for sv in np.linspace(-parallel_scale*4, parallel_scale*4, nsample):
+        vt = resample_from_flow_2d(ves+0, sv*ves)
+        sim = torch.abs(F.cosine_similarity(ves+0, vt))
+        total_sim = total_sim + sim
+
+    total_sim = total_sim/nsample
+    total_sim = total_sim[:, None]
+
+    #return v + 0.05*total_sim
+    return v*total_sim
 
 
 def v1_sqmax_vesselness(image, ves, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2):
@@ -1209,6 +1248,9 @@ def v1_sqmax_vesselness(image, ves, nsample=12, vtype='light', mask=None, percen
         i_range2 = torch.cat(i_range2, 1)
         i_std2 = i_range2.std(1, unbiased=False) + 1e-5
         response2 = response2 / i_std2 / N
+    else:
+        response1 = response1 / N
+        response2 = response2 / N
 
     # Correct the response accordingly
     if vtype == 'light':
@@ -1285,7 +1327,6 @@ def vessel_loss_2dv1_sqmax(output, data, config, maxfilter=True):
         # parameters are v1, v2
         loss = 0.0
         v1 = vessel[:, 2:4]
-
         # Consistency loss
         if l_consistency:
             # Align v1 = v(x1) and v2 = v(x1 + v1) to be along same directions

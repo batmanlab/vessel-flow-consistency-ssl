@@ -120,7 +120,7 @@ def v13d_sq_vesselness(image, v1, nsample=12, vtype='light', mask=None, percenti
 
     if is_crosscorr:
         i_range = torch.cat(i_range, 1)
-        i_std = i_range.std(1, unbiased=False) + 1e-5
+        i_std = i_range.std(1, unbiased=False) + 1e-7
         response = response / i_std / (nsample**2) / 4
         # Check assertion
         idx = (-1 <= response)*(response <= 1)
@@ -181,6 +181,7 @@ def vessel_loss_3dmax(output, data, config, maxfilter=True):
 
     # Get outputs and inputs
     vessel = output['vessel']
+    recon  = output['recon']
     image = data['image']
 
     # Take mask for all losses
@@ -197,6 +198,10 @@ def vessel_loss_3dmax(output, data, config, maxfilter=True):
         v1x = resample_from_flow_3d(v1+0, v1+0)
         loss = loss - l_consistency * F.cosine_similarity(v1, v1x).mean()
 
+    # Decoder loss
+    if l_decoder:
+        loss = loss + l_decoder * L2(recon, image)
+
     # Check for cosine similarity
     if l_cosine:
         v1x = resample_from_flow_3d(v1+0, v1+0)
@@ -208,6 +213,7 @@ def vessel_loss_3dmax(output, data, config, maxfilter=True):
     vessel_conv = 0.0
     if l_template:
         vessel_conv = vesselnessfun(image, v1, num_samples_template, vessel_type, is_crosscorr=is_crosscorr, parallel_scale=parallel_scale)
+        #print(vessel_conv.min(), vessel_conv.max())
         loss = loss + l_template * (1 - (mask*vessel_conv).mean())
 
     # Vessel intensity consistency loss

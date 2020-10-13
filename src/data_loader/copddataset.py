@@ -8,57 +8,39 @@ from PIL import Image
 from skimage.morphology import disk, white_tophat, erosion, dilation
 from scipy import ndimage as nd
 import nibabel as nib
+import SimpleITK as sitk
+
+def load_image(imgfile):
+    img = sitk.ReadImage(imgfile)
+    img = sitk.GetArrayFromImage(img)
+    return img
 
 PATCHSIZE=64
 GAP = 48
 
 class COPDDataset(Dataset):
 
-    def __init__(self, data_dir, train=True, patientIDs=None, minibatch=4, augment=False):
+    def __init__(self, data_dir, train=True, patientIDs=None, minibatch=4, augment=False, minval=-250, maxval=250):
         self.data_dir = data_dir
         self.train = train
         self.minibatch = minibatch
         if not train:
             augment = False
         self.augment = augment
+        self.minval = minval*1.0
+        self.maxval = maxval*1.0
 
-        if patientIDs is None:
-            maxI = 20
-        else:
-            maxI = -1
+        for r, dirs, files in os.walk(data_dir):
+            self.files = list(map(lambda x: os.path.join(r, x), files))
 
-        # Load images
-        if not patientIDs:
-            for r, dirs, files in os.walk(data_dir):
-                dirs = sorted(dirs)
-                patientIDs = dirs
-                break
-        patientIDs = sorted(patientIDs)
-        self.patientIDs = []
-        # Create a set of patches we can create
-        i=0
-        self.files = []
-        for pid in patientIDs:
-            patientpath = os.path.join(self.data_dir, pid, 'Phase-1/RAW')
-            for r, dirs, files in os.walk(patientpath):
-                # print(i, patientpath, "dir exists")
-                # Get the standard nii.gz file
-                files = list(filter(lambda x: 'INSP' in x and 'STD' in x and 'nii.gz' in x, files))
-                self.files.append(os.path.join(r, files[0]))
-                self.patientIDs.append(pid)
-                i += 1
-            # Keep a max number of patients only
-            if i == maxI:
-                break
-
-        # print(len(self.files))
-        # print(self.files)
+        print(len(self.files))
+        print(self.files)
 
         # Create patches and cumulative patches
         self.total_patches = []
         self.cumulative_patches = [0]
         for file in self.files:
-            img = nib.load(file)
+            img = load_image(file)
             shape = img.shape
             n1 = (shape[0] - PATCHSIZE)//GAP
             n2 = (shape[1] - PATCHSIZE)//GAP
@@ -66,15 +48,15 @@ class COPDDataset(Dataset):
             patches = n1*n2*n3
             self.total_patches.append((patches, n1, n2, n3))
             self.cumulative_patches.append(self.cumulative_patches[-1] + patches)
-        self.cumulative_patches = self.cumulative_patches[1:]
 
+        self.cumulative_patches = self.cumulative_patches[1:]
 
     def __len__(self,):
         return self.cumulative_patches[-1]
 
     def normalize(self, img):
-        M = img.max()
-        m = img.min()
+        M = self.maxval
+        m = self.minval
         return (img - m)/(M-m)
 
     def get_patch(self, img, n1, n2, n3):
@@ -102,9 +84,9 @@ class COPDDataset(Dataset):
         # Load image
         imgpatches = []
         identifiers = []
-        img = nib.load(self.files[imgidx])
-        img = img.get_fdata()
+        img = load_image(self.files[imgidx])
         img = self.normalize(img)
+        #print(img.min(), img.max())
 
         # Get patches from the image with identifiers
         imgpatches.append(self.get_patch(img, n1, n2, n3))
@@ -123,3 +105,9 @@ class COPDDataset(Dataset):
             # 'mask' : torch.FloatTensor(mask),
         }
 
+
+if __name__ == '__main__':
+    ds = COPDDataset('/pghbio/dbmi/batmanlab/rohit33/COPD/train/croppedCT/')
+    print(len(ds))
+    print(ds[0]['image'].shape)
+    print(ds[0]['image'].mean())

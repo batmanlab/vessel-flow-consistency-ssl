@@ -7,14 +7,14 @@
             "in_channels": 1,
             "out_channels": 3,
             "min_scale": 0.5,
-            "vessel_scale_factor": 5.5
+            "vessel_scale_factor": 11.5,
         }
     },
     "log_dir": "/pghbio/dbmi/batmanlab/rohit33/saved_models",
     "data_loader": {
         "type": "COPDDataLoader",
         "args": {
-            "data_dir": "/pghbio/dbmi/batmanlab/Data/COPDGene/Images/",
+            "data_dir": "/pghbio/dbmi/batmanlab/rohit33/COPD/train/croppedCT/",
             "batch_size": 2,
             "shuffle": true,
             "validation_split": 0,
@@ -34,10 +34,10 @@
     "loss_args": {
         "loss_intensity": "L2",
         "lambda_template": 1,
-        "lambda_intensity": 0,
+        "lambda_intensity": 1,
         "lambda_cosine": 1,
         "lambda_consistency": 0,
-        "lambda_decoder": 0,
+        "lambda_decoder": 1,
         "parallel_scale": 2,
         "is_crosscorr": true,
         "detach": true,
