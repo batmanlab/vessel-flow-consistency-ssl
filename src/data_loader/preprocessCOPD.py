@@ -82,7 +82,7 @@ H, W, D = cropimg.shape
 Ho = H + (48 - (H-64)%48)%48
 Wo = W + (48 - (W-64)%48)%48
 Do = D + (48 - (D-64)%48)%48
-outimg = np.zeros((Ho, Wo, Do))
+outimg = np.zeros((Ho, Wo, Do)) + args.minval
 outimg[:H, :W, :D] = cropimg
 print(img.shape, cropimg.shape, outimg.shape)
 
