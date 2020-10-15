@@ -85,11 +85,13 @@ def get_orthogonal_basis(v1, scale_vector=True):
     else:
         scale = 1
 
+    '''
     c = torch.abs(v1)
-    c = c- torch.min(v1, 1, keepdim=True).values
+    c = c - torch.min(v1, 1, keepdim=True).values
     c = (c <= 0).float()
     c = c.detach()
-
+    '''
+    c = torch.randn_like(v1, device=v1.device)
     v2 = scale*normalize_vector(torch.cross(c, v1, dim=1))
     v3 = scale*normalize_vector(torch.cross(v1, v2, dim=1))
     return v2, v3
@@ -177,7 +179,7 @@ def vessel_loss_3dmax(output, data, config, maxfilter=True):
         vesselnessfun = v13d_sqmax_vesselness
 
     # check if we want to minimize cross correlation
-    is_crosscorr = args.get('is_crosscorr', False)
+    is_crosscorr = args.get('is_crosscorr', True)
 
     # Get outputs and inputs
     vessel = output['vessel']
