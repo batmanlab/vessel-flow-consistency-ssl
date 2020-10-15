@@ -1,5 +1,6 @@
 """ Parts of the U-Net model """
 import torch
+import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -100,6 +101,10 @@ class UNet(nn.Module):
         self.outv = OutConv(64, out_channels//2*3)
         self.outr = OutConv(64, inp_channels)
 
+        # Model bifurcations using two angles and a weighing parameter
+        self.bangle = OutConv(64, 2)
+        self.bwt = OutConv(64, 1)
+
     def forward(self, x):
         x1 = x['image']
         x1 = self.inc(x1)
@@ -114,6 +119,12 @@ class UNet(nn.Module):
         # Get vessel outputs and reconstruction
         out = self.outv(x)
         recon = self.outr(x)
+
+        # Get bifurcation parameters too
+        # Make angles from [15, 90]
+        bangle = torch.sigmoid(self.bangle(x))*(90 - 15.0) + 15.0
+        bangle = bangle/180.0 * np.pi
+        bwt = torch.sigmoid(self.bwt(x))
 
         # convert vessel into scale and direction
         chan = int(self.out_channels//2)
@@ -131,4 +142,6 @@ class UNet(nn.Module):
         return {
             'recon': recon,
             'vessel': out,
+            'bangle': bangle,
+            'bwt': bwt,
         }
