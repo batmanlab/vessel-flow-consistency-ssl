@@ -1214,7 +1214,20 @@ def v1_sqmax_vesselness_test(image, output, nsample=12, vtype='light', mask=None
     return v*total_sim
 
 
-def v1_sqmax_vesselness(image, output, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2):
+def v1_sqmax_vesselness(image, output, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2, sv_range=None):
+    '''
+    Parameter list:
+    image: Image on which vesselness needs to be calculated
+    output: dictionary of all outputs, vessel is in the keyword
+    nsample: number of datapoints to sample from each side
+    vtype: vessel type (light, dark or both)
+    mask: optional mask to mask ROI for vesselness
+    percentile: deprecated
+    is_crosscorr: Should we use cross-correlation or not? Might help for detecting low-contrast vessels as well
+    v1: deprecated, calculated from output
+    parallel_scale: Scale upto which it should be calculated
+    sv_range: A range for calculating the extent of 'v1' (can be useful for bifurcations)
+    '''
     response1 = 0.0
     response2 = 0.0
     i_range1 = []
@@ -1229,7 +1242,12 @@ def v1_sqmax_vesselness(image, output, nsample=12, vtype='light', mask=None, per
     D = 0
     N = nsample*nsample/2
 
-    for sv in np.linspace(-parallel_scale, parallel_scale, nsample):
+    # Default range is [-parallel_scale, parallel_scale]
+    if sv_range is None:
+        sv_range = (-parallel_scale, parallel_scale)
+    assert len(sv_range) == 2
+
+    for sv in np.linspace(sv_range[0], sv_range[1], nsample):
         # Get perp profile
         for s in np.linspace(-2, 2, nsample):
             filt = 2*int(abs(s) < 1) - 1
@@ -1262,10 +1280,8 @@ def v1_sqmax_vesselness(image, output, nsample=12, vtype='light', mask=None, per
     # Correct the response accordingly
     if vtype == 'light':
         response = torch.min(response1, response2)
-        pass
     elif vtype == 'dark':
         response = torch.min(-response1, -response2)
-        #response = -response
     elif vtype == 'both':
         response = torch.min(torch.abs(response1), torch.abs(response2))
     else:
@@ -1277,8 +1293,78 @@ def v1_sqmax_vesselness(image, output, nsample=12, vtype='light', mask=None, per
     return response
 
 
+def rotate_vector_2d(v1, theta):
+    '''
+    v1 is a vector of size [B, 2N, H, W] containing (x1, y1), ... (xn, yn)
+    theta is a vector of size [B, 1, H, W] containing angle in radians
+    '''
+    N = v1.shape[1]
+    tN = theta.shape[1]
+    assert tN == 1
+    assert N%2 == 0
+    # Now edit the vectors
+    outv = torch.zeros_like(v1, device=v1.device)
+    cos = torch.cos(theta).squeeze()
+    sin = torch.sin(theta).squeeze()
+    # For each vector, put the appropriate value
+    for i in range(N//2):
+        x = v1[:, 2*i]
+        y = v1[:, 2*i+1]
+        # Get rotated coordinates
+        X = x*cos - y*sin
+        Y = x*sin + y*cos
+        # save to new vector
+        outv[:, 2*i] = X
+        outv[:, 2*i+1] = Y
+    outv = outv.contiguous()
+    return outv
+
+
+def v1_sqmax_bifurc(image, output, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2, sv_range=None):
+    '''
+    Compute bifurcation vesselness separately
+    '''
+    output1 = {}
+    output2 = {}
+    theta1 = -output['bangle'][:, 0:1]
+    theta2 =  output['bangle'][:, 1:2]
+    # Get vessel direction
+    v1 = output['vessel']
+    # Get vb1 and vb2
+    vbranch1 = rotate_vector_2d(-v1, theta1)
+    vbranch2 = rotate_vector_2d(-v1, theta2)
+    # Put them into new dicts
+    output1['vessel'] = vbranch1
+    output2['vessel'] = vbranch2
+    # Put them into sq vesselness
+    v_straight = v1_sqmax_vesselness(image, output, nsample, vtype, mask, percentile, is_crosscorr, None, parallel_scale, (0, parallel_scale))
+    v_b1 = v1_sqmax_vesselness(image, output1, nsample, vtype, mask, percentile, is_crosscorr, None, parallel_scale, (0, parallel_scale))
+    v_b2 = v1_sqmax_vesselness(image, output2, nsample, vtype, mask, percentile, is_crosscorr, None, parallel_scale, (0, parallel_scale))
+    return (v_straight + v_b1 + v_b2)/3.0
+
+
+def v1_sqmax_jointvesselness(image, output, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2, sv_range=None):
+    '''
+    Joint vesselness using both normal vessels and bifurcations
+    '''
+    normalv = v1_sqmax_vesselness(image, output, nsample, vtype, mask, percentile, is_crosscorr, None, parallel_scale, sv_range)
+    bifurcv = v1_sqmax_bifurc(image, output, nsample, vtype, mask, percentile, is_crosscorr, None, parallel_scale, sv_range)
+    bwt = output['bwt']
+    return bwt*bifurcv + (1 - bwt)*normalv
+
+
 def vessel_loss_2dv1_sq(output, data, config):
     return vessel_loss_2dv1_sqmax(output, data, config, maxfilter=False)
+
+
+def vessel_loss_2dv1_bifurcmax(output, data, config):
+    '''
+    Loss with bifurcation consideration
+    '''
+    args = config['loss_args']
+    bifurc_mode = args.get('bifurc_mode')
+    assert bifurc_mode in ['joint', 'detach']
+    return vessel_loss_2dv1_sqmax(output, data, config)
 
 
 def vessel_loss_2dv1_sqmax(output, data, config, maxfilter=True):
@@ -1305,14 +1391,20 @@ def vessel_loss_2dv1_sqmax(output, data, config, maxfilter=True):
     detach = args.get('detach', True)
     # This parameter is for type of vessel
     vessel_type = config.get('vessel_type', 'light') # should be light, dark or both
-
     parallel_scale = args.get('parallel_scale', 2)
+
+    # Bifurcation parameters
+    bifurc_mode = args.get('bifurc_mode')
+    l_bifurcwt = args.get('lambda_bifurcwt')
 
     # Check for max filter
     if maxfilter==False:
         vesselnessfun = v1_sq_vesselness
+        raise NotImplementedError
     else:
-        vesselnessfun = v1_sqmax_vesselness
+        vesselnessfun = v1_sqmax_vesselness             # This function is only for vesselness
+        bifurcfun = v1_sqmax_bifurc                     # This function is for bifurcation only
+        jointvesselnessfun = v1_sqmax_jointvesselness   # This function combines both methods with weighted average
 
     # check if we want to minimize cross correlation
     is_crosscorr = args.get('is_crosscorr', False)
@@ -1355,11 +1447,35 @@ def vessel_loss_2dv1_sqmax(output, data, config, maxfilter=True):
         vessel_conv = 0.0
         if l_template:
             vessel_conv = vesselnessfun(image, output, num_samples_template, vessel_type, is_crosscorr=is_crosscorr, parallel_scale=parallel_scale)
-            loss = loss + l_template * (1 - (mask*vessel_conv).mean())
+            # Calculate loss depending on what bifurcation mode we choose
+            if bifurc_mode is None:
+                loss = loss + l_template * (1 - (mask*vessel_conv).mean())
+            else:
+                # There is a bifurcation mode (either joint or detach)
+                if bifurc_mode == 'joint':
+                    # Joint mode, take weighted average of vesselness and optimize this directly
+                    jointv = jointvesselnessfun(image, output, num_samples_template, vessel_type, is_crosscorr=is_crosscorr, parallel_scale=parallel_scale)
+                    loss = loss + l_template * (1 - (mask*jointv).mean())
+                else:
+                    bifurcves = bifurcfun(image, output, num_samples_template, vessel_type, is_crosscorr=is_crosscorr, parallel_scale=parallel_scale)
+                    # Add bifurc loss and normal vessels separately
+                    loss = loss + l_template * (1 - (mask*vessel_conv).mean())
+                    loss = loss + l_template * (1 - (mask*bifurcves).mean())
+                    # Compute weights of balancing parameter 'b'
+                    bwt = output['bwt']
+                    bwt_loss =  bwt * bifurcves.detach() + (1 - bwt) * vessel_conv.detach()
+                    # Calculate loss
+                    loss = loss + l_bifurcwt * (1 - (mask*bwt_loss).mean())
+
 
         # Vessel intensity consistency loss
         if l_intensity:
-            for scale in np.linspace(-parallel_scale/2., parallel_scale/2., 5):
+            if bifurc_mode is None:
+                lower = -parallel_scale/2.0
+            else:
+                lower = 0
+            # If there are bifurcations in consideration, then only move along the lower half
+            for scale in np.linspace(lower, parallel_scale/2.0, 5):
                 # Check for both directions for same intensity -> this will help in centerline prediction
                 i_parent = resample_from_flow_2d(vessel_conv, scale*v1)
                 loss = loss + l_intensity * (L_loss(vessel_conv, i_parent, mask=mask))/5.0

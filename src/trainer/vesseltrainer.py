@@ -55,6 +55,9 @@ class VesselTrainer(BaseTrainer):
             self.vesselfunc = v1_sqmax_vesselness
         elif self.config['loss'] == 'vessel_loss_2dv1_sq':
             self.vesselfunc = v1_sq_vesselness
+            # Bifurcation variants incoming
+        elif self.config['loss'] == 'vessel_loss_2dv1_bifurcmax':
+            self.vesselfunc = v1_sqmax_jointvesselness
         else:
             assert False, 'Unknown loss function {}'.format(self.config['loss'])
 

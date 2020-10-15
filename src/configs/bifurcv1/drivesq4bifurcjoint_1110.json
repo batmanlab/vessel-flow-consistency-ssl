@@ -1,0 +1,74 @@
+{
+    "name": "drivesq4_v1bifurcjoint",
+    "n_gpu": 2,
+    "arch": {
+        "type": "UNet",
+        "args": {
+            "inp_channels": 1,
+            "out_channels": 4,
+            "min_scale": 0.5,
+            "vessel_scale_factor": 4.5
+        }
+    },
+    "log_dir": "/pghbio/dbmi/batmanlab/rohit33/saved_models",
+    "data_loader": {
+        "type": "DRIVEDataLoader",
+        "args": {
+            "data_dir": "/pghbio/dbmi/batmanlab/rohit33/DRIVE/",
+            "batch_size": 4,
+            "shuffle": true,
+            "validation_split": 0,
+            "num_workers": 4,
+            "toy": false
+        }
+    },
+    "vessel_type": "dark",
+    "optimizer": {
+        "type": "Adam",
+        "args":{
+            "lr": 0.001,
+            "weight_decay": 0,
+            "amsgrad": true
+        }
+    },
+    "loss": "vessel_loss_2dv1_bifurcmax",
+    "loss_args": {
+        "num_directions": 2,
+        "eps": 1e-1,
+        "uncertainty": false,
+        "loss_intensity": "L2",
+        "lambda_template": 1,
+        "lambda_intensity": 1,
+        "lambda_cosine": 1,
+        "lambda_consistency": 0,
+        "lambda_decoder": 0,
+        "is_crosscorr": true,
+        "use_mask": true,
+        "detach": true,
+        "num_samples_template": 12,
+        "bifurc_mode": "joint",
+        "lambda_bifurcwt": 0.5
+    },
+    "metrics": [
+        "recon_error_l2"
+    ],
+    "lr_scheduler": {
+        "type": "StepLR",
+        "args": {
+            "step_size": 50,
+            "gamma": 1
+        }
+    },
+    "trainer": {
+        "epochs": 5000,
+        "save_dir": "/pghbio/dbmi/batmanlab/rohit33/saved_models",
+        "save_period": 20,
+        "verbosity": 2,
+        "monitor": "min val_loss",
+        "early_stop": 1000,
+        "quiver_scale": 2,
+        "normalize_flow": true,
+        "normalize_flow_rev": true,
+        "tensorboard": true
+    }
+}
