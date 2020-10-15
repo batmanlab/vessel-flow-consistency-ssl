@@ -1117,9 +1117,10 @@ def mutualinformation(image, ves, mask=None, bins=None, sigma_factor=0.5, epsilo
         raise NotImplementedError
 
 
-def v1_sq_vesselness_test(image, ves, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2):
-    v = v1_sq_vesselness(image, ves, nsample, vtype, mask, percentile, is_crosscorr, v1, parallel_scale)
+def v1_sq_vesselness_test(image, output, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2):
+    v = v1_sq_vesselness(image, output, nsample, vtype, mask, percentile, is_crosscorr, v1, parallel_scale)
     #v = torch.exp(v)
+    ves = output['vessel'][:, 2:4]
 
     #### Additional dissimilarity
     total_sim = 0.0
@@ -1135,11 +1136,13 @@ def v1_sq_vesselness_test(image, ves, nsample=12, vtype='light', mask=None, perc
     return v*total_sim
 
 
-def v1_sq_vesselness(image, ves, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2):
+def v1_sq_vesselness(image, output, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2):
     response1 = 0.0
     response2 = 0.0
     i_range1 = []
     i_range2 = []
+
+    ves = output['vessel'][:, 2:4]
 
     v2 = ves*0
     v2[:, 1] = ves[:, 0] + 0
@@ -1191,9 +1194,11 @@ def v1_sq_vesselness(image, ves, nsample=12, vtype='light', mask=None, percentil
     return response
 
 
-def v1_sqmax_vesselness_test(image, ves, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2):
-    v = v1_sqmax_vesselness(image, ves, nsample, vtype, mask, percentile, is_crosscorr, v1, parallel_scale)
+def v1_sqmax_vesselness_test(image, output, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2):
+    v = v1_sqmax_vesselness(image, output, nsample, vtype, mask, percentile, is_crosscorr, v1, parallel_scale)
     #v = torch.exp(v)
+
+    ves = output['vessel'][:, 2:4]
 
     #### Additional dissimilarity
     total_sim = 0.0
@@ -1209,11 +1214,13 @@ def v1_sqmax_vesselness_test(image, ves, nsample=12, vtype='light', mask=None, p
     return v*total_sim
 
 
-def v1_sqmax_vesselness(image, ves, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2):
+def v1_sqmax_vesselness(image, output, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2):
     response1 = 0.0
     response2 = 0.0
     i_range1 = []
     i_range2 = []
+
+    ves = output['vessel'][:, 2:4]
 
     v2 = ves*0
     v2[:, 1] = ves[:, 0] + 0
@@ -1347,7 +1354,7 @@ def vessel_loss_2dv1_sqmax(output, data, config, maxfilter=True):
         # Check profile by taking convolution with the template [-1 -1 1 1 1 1 -1 -1]
         vessel_conv = 0.0
         if l_template:
-            vessel_conv = vesselnessfun(image, v1, num_samples_template, vessel_type, is_crosscorr=is_crosscorr, parallel_scale=parallel_scale)
+            vessel_conv = vesselnessfun(image, output, num_samples_template, vessel_type, is_crosscorr=is_crosscorr, parallel_scale=parallel_scale)
             loss = loss + l_template * (1 - (mask*vessel_conv).mean())
 
         # Vessel intensity consistency loss

@@ -124,15 +124,16 @@ def main(config, args):
             if mask is not None:
                 mask = mask.cpu()
 
-            v2 = output['vessel'][:, 2:4].cpu()
+            #v2 = output['vessel'][:, 2:4].cpu()
+            output['vessel'] = output['vessel'].cpu()
 
             # Change this for different vesselness modes
             if True:
-                ves = vesselfunc(data['image'].cpu(), v2, vtype=vessel_type, mask=mask, is_crosscorr=args.crosscorr, parallel_scale=parallel_scale)
+                ves = vesselfunc(data['image'].cpu(), output, vtype=vessel_type, mask=mask, is_crosscorr=args.crosscorr, parallel_scale=parallel_scale)
                 ves = ves.data.cpu().numpy()
                 ves = smooth(ves)
             else:
-                ves = vesselfunc(data['image'].cpu(), v2, vtype=vessel_type, mask=mask, is_crosscorr=False, parallel_scale=parallel_scale)
+                ves = vesselfunc(data['image'].cpu(), output, vtype=vessel_type, mask=mask, is_crosscorr=False, parallel_scale=parallel_scale)
                 ves = smooth(ves)
                 ves = v2_avg(ves, v2, vtype='light', mask=mask, is_crosscorr=False, parallel_scale=parallel_scale)
                 ves = ves.data.cpu().numpy()
