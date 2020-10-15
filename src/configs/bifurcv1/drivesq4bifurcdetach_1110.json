@@ -1,5 +1,5 @@
 {
-    "name": "drivesq4_v1bifurcjoint",
+    "name": "drivesq4_v1bifurcdetach",
     "n_gpu": 2,
     "arch": {
         "type": "UNet",
@@ -46,7 +46,7 @@
         "use_mask": true,
         "detach": true,
         "num_samples_template": 12,
-        "bifurc_mode": "joint",
+        "bifurc_mode": "detach",
         "lambda_bifurcwt": 0.5
     },
     "metrics": [
