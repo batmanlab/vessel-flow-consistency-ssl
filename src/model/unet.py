@@ -80,7 +80,8 @@ class OutConv(nn.Module):
 """ Full assembly of the parts to form the complete network """
 
 class UNet(nn.Module):
-    def __init__(self, inp_channels=1, out_channels=4, min_scale=0, vessel_scale_factor=16, bilinear=True):
+    def __init__(self, inp_channels=1, out_channels=4, min_scale=0, vessel_scale_factor=16, bilinear=True, bifurc=False, \
+            mintheta=15, maxtheta=90):
         super(UNet, self).__init__()
         self.inp_channels = inp_channels
         self.out_channels = out_channels
@@ -101,9 +102,14 @@ class UNet(nn.Module):
         self.outv = OutConv(64, out_channels//2*3)
         self.outr = OutConv(64, inp_channels)
 
+        self.mintheta = mintheta
+        self.maxtheta = maxtheta
+
         # Model bifurcations using two angles and a weighing parameter
-        self.bangle = OutConv(64, 2)
-        self.bwt = OutConv(64, 1)
+        self.bifurc = bifurc
+        if bifurc:
+            self.bangle = OutConv(64, 2)
+            self.bwt = OutConv(64, 1)
 
     def forward(self, x):
         x1 = x['image']
@@ -122,9 +128,13 @@ class UNet(nn.Module):
 
         # Get bifurcation parameters too
         # Make angles from [15, 90]
-        bangle = torch.sigmoid(self.bangle(x))*(90 - 15.0) + 15.0
-        bangle = bangle/180.0 * np.pi
-        bwt = torch.sigmoid(self.bwt(x))
+        if self.bifurc:
+            bangle = torch.sigmoid(self.bangle(x))*(self.maxtheta - self.mintheta) + self.mintheta
+            bangle = bangle/180.0 * np.pi
+            bwt = torch.sigmoid(self.bwt(x))
+        else:
+            bangle = None
+            bwt = None
 
         # convert vessel into scale and direction
         chan = int(self.out_channels//2)

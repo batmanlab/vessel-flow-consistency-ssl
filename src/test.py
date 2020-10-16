@@ -20,7 +20,7 @@ def to_device(data, device):
     return data
 
 
-def smooth(ves, s=0.7):
+def smooth(ves, s=1):
     # image = [B, C, H, W]
     smoothves = ves * 0
     B, C, H, W = ves.shape
@@ -73,15 +73,24 @@ def main(config, args):
         vesselfunc = v1_sqmax_vesselness_test
     elif config['loss'] == 'vessel_loss_2dv1_sq':
         vesselfunc = v1_sq_vesselness_test
+    elif config['loss'] == 'vessel_loss_2dv1_bifurcmax':
+        vesselfunc = v1_sqmax_jointvesselness_test
     else:
         assert False, 'Unknown loss function {}'.format(config['loss'])
     print(vesselfunc)
+
+    if 'max' in config['loss']:
+        s = 1
+    else:
+        s = 0.7
+    print("Smoothness {}".format(s))
 
     ## Check with curved vesselness
     # vesselfunc = v2_curved_vesselness
     # parallel_scale = [10, 10]
 
     parallel_scale = config.config['loss_args'].get('parallel_scale', 2)
+    sv_range = config.config['loss_args'].get('sv_range')
     # build model architecture
     model = config.init_obj('arch', module_arch)
     model.eval()
@@ -125,17 +134,23 @@ def main(config, args):
                 mask = mask.cpu()
 
             #v2 = output['vessel'][:, 2:4].cpu()
-            output['vessel'] = output['vessel'].cpu()
+            #output['vessel'] = output['vessel'].cpu()
+
+            for k, v in output.items():
+                try:
+                    output[k] = v.cpu()
+                except:
+                    pass
 
             # Change this for different vesselness modes
             if True:
-                ves = vesselfunc(data['image'].cpu(), output, vtype=vessel_type, mask=mask, is_crosscorr=args.crosscorr, parallel_scale=parallel_scale)
+                ves = vesselfunc(data['image'].cpu(), output, vtype=vessel_type, mask=mask, is_crosscorr=args.crosscorr, parallel_scale=parallel_scale, sv_range=sv_range)
                 ves = ves.data.cpu().numpy()
-                ves = smooth(ves)
+                ves = smooth(ves, s)
             else:
-                ves = vesselfunc(data['image'].cpu(), output, vtype=vessel_type, mask=mask, is_crosscorr=False, parallel_scale=parallel_scale)
-                ves = smooth(ves)
-                ves = v2_avg(ves, v2, vtype='light', mask=mask, is_crosscorr=False, parallel_scale=parallel_scale)
+                ves = vesselfunc(data['image'].cpu(), output, vtype=vessel_type, mask=mask, is_crosscorr=False, parallel_scale=parallel_scale, sv_range=sv_range)
+                ves = smooth(ves, s)
+                ves = v2_avg(ves, v2, vtype='light', mask=mask, is_crosscorr=False, parallel_scale=parallel_scale, sv_range=sv_range)
                 ves = ves.data.cpu().numpy()
 
 
@@ -172,7 +187,7 @@ if __name__ == '__main__':
     args.add_argument('-d', '--device', default=None, type=str,
                       help='indices of GPUs to enable (default: all)')
     args.add_argument('--run_id', default='test')
-    args.add_argument('--crosscorr', default=1, type=int)
+    args.add_argument('--crosscorr', default=0, type=int)
     args.add_argument('--dataset', default="", type=str)
     args.add_argument('--train', default=0, type=int)
 
