@@ -38,6 +38,11 @@ def main(config):
     optimizer = config.init_obj('optimizer', torch.optim, trainable_params)
 
     lr_scheduler = config.init_obj('lr_scheduler', torch.optim.lr_scheduler, optimizer)
+    squeeze = config['data_loader']['type']
+    if 'COPD' in squeeze:
+        squeeze = True
+    else:
+        squeeze = False
 
     print(config)
     if '3d' not in config['loss']:
@@ -50,6 +55,7 @@ def main(config):
         trainer = COPDTrainer(model, criterion, metrics, optimizer,
                           config=config,
                           data_loader=data_loader,
+                          squeeze=squeeze,
                           valid_data_loader=valid_data_loader,
                           lr_scheduler=lr_scheduler)
     trainer.train()

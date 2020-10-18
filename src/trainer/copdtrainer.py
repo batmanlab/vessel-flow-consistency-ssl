@@ -27,10 +27,11 @@ class COPDTrainer(BaseTrainer):
     data_loader: training loader
     valid_data_loader: validation training loader
     """
-    def __init__(self, model, criterion, metric_ftns, optimizer, config, data_loader,
+    def __init__(self, model, criterion, metric_ftns, optimizer, config, data_loader, squeeze=True,
                  valid_data_loader=None, lr_scheduler=None, len_epoch=None):
         super().__init__(model, criterion, metric_ftns, optimizer, config)
         self.config = config
+        self.squeeze = squeeze
         self.data_loader = data_loader
         if len_epoch is None:
             # epoch-based training
@@ -78,7 +79,8 @@ class COPDTrainer(BaseTrainer):
         for batch_idx, data in enumerate(self.data_loader):
             # Move tensors to device
             data = self._to_device(data)
-            data = squeeze_batch(data)
+            if self.squeeze:
+                data = squeeze_batch(data)
 
             self.optimizer.zero_grad()
             output = self.model(data)
@@ -161,7 +163,8 @@ class COPDTrainer(BaseTrainer):
             for batch_idx, data in enumerate(self.valid_data_loader):
                 # Move tensors to device
                 data = self._to_device(data)
-                data = squeeze_batch(data)
+                if self.squeeze:
+                    data = squeeze_batch(data)
 
                 output = self.model(data)
                 loss = self.criterion(output, data, self.config)
