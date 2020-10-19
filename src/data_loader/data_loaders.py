@@ -32,7 +32,7 @@ class COPDDataLoader(BaseDataLoader):
     '''
     Dataloader for COPD dataset
     '''
-    def __init__(self, data_dir, batch_size, shuffle=True, validation_split=0.0, num_workers=1, training=True, augment=True, patientIDs=None):
+    def __init__(self, data_dir, batch_size, shuffle=True, validation_split=0.0, num_workers=1, training=True, augment=True, patientIDs=None, sigma=0):
         self.data_dir = data_dir
         self.dataset = COPDDataset(data_dir, train=training, patientIDs=patientIDs, minibatch=batch_size, augment=augment)
         super().__init__(self.dataset, 1, shuffle, validation_split, num_workers)
@@ -42,7 +42,7 @@ class VascuDataLoader(BaseDataLoader):
     '''
     Data loader for VascuSynth dataset
     '''
-    def __init__(self, data_dir, batch_size, shuffle=True, validation_split=0.0, num_workers=1, training=True, sigma=0.1):
+    def __init__(self, data_dir, batch_size, shuffle=True, validation_split=0.0, num_workers=1, training=True, patientIDs=None, sigma=0.1):
         self.data_dir = data_dir
         self.dataset = VascuDataset(data_dir, train=training, sigma=sigma)
         super().__init__(self.dataset, batch_size, shuffle, validation_split, num_workers)

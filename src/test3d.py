@@ -23,7 +23,7 @@ def to_device(data, device):
 def smooth(ves, s=1):
     # image = [B, C, H, W]
     smoothves = ves * 0
-    B, C, H, W = ves.shape
+    B, C, H, W, D = ves.shape
     for b in range(B):
         for c in range(C):
             if isinstance(ves, torch.Tensor):
@@ -37,46 +37,26 @@ def smooth(ves, s=1):
 def main(config, args):
     logger = config.get_logger('test')
 
-    # setup data_loader instances
-    if "STARE" in args.dataset:
-        config['data_loader']['type'] = "STAREDataLoader"
-        config['data_loader']['args']['data_dir'] = config['data_loader']['args']['data_dir'].replace('DRIVE', 'STARE')
-
-
     training = True if args.train else False
     trainstr = "train" if args.train != 0 else "test"
 
     data_loader = getattr(module_data, config['data_loader']['type'])(
         config['data_loader']['args']['data_dir'],
-        batch_size=512,
+        batch_size=1,
         shuffle=False,
-        toy=config['data_loader']['args']['toy'],
-        preprocessing=config['data_loader']['args'].get('preprocessing'),
         validation_split=0.0,
         training=training,
-        augment=False,
-        num_workers=2
+        patientIDs=config['data_loader']['args'].get('patientIDs'),
+        sigma=config['data_loader']['args'].get('sigma'),
+        num_workers=2,
     )
 
-    ## Vesselness function
+    ## Vesselness function (3d versions only here)
+    ## TODO
     if config.config['loss'] == 'vessel_loss_2d_sq':
         vesselfunc = v2_sq_vesselness
-    elif config.config['loss'] == 'vessel_loss_2d_path':
-        vesselfunc = v2_path_vesselness
-    elif config['loss'] == 'vessel_loss_2d_dampen':
-        vesselfunc = v2vesselness
-    elif config['loss'] == 'vessel_loss_2d_curved':
-        vesselfunc = v2_curved_vesselness
-    elif config['loss'] == 'vessel_loss_2d_sqmax':
-        vesselfunc = v2_sqmax_vesselness
-    elif config['loss'] == 'vessel_loss_2dv1_sqmax':
-        vesselfunc = v1_sqmax_vesselness_test
-    elif config['loss'] == 'vessel_loss_2dv1_sq':
-        vesselfunc = v1_sq_vesselness_test
-    elif config['loss'] == 'vessel_loss_2dv1_bifurcmax':
-        vesselfunc = v1_sqmax_jointvesselness_test
-    elif config['loss'] == 'vessel_loss_2dv1_bifurconlymax':
-        vesselfunc = v1_sqmax_bifurconly_test
+    elif config.config['loss'] == 'vessel_loss_3d':
+        vesselfunc = v13d_sq_vesselness_test
     else:
         assert False, 'Unknown loss function {}'.format(config['loss'])
     print(vesselfunc)
@@ -87,12 +67,10 @@ def main(config, args):
         s = 0.7
     print("Smoothness {}".format(s))
 
-    ## Check with curved vesselness
-    # vesselfunc = v2_curved_vesselness
-    # parallel_scale = [10, 10]
-
+    # More information
     parallel_scale = config.config['loss_args'].get('parallel_scale', 2)
     sv_range = config.config['loss_args'].get('sv_range')
+
     # build model architecture
     model = config.init_obj('arch', module_arch)
     model.eval()
@@ -108,6 +86,10 @@ def main(config, args):
     if config['n_gpu'] > 1:
         model = torch.nn.DataParallel(model)
 
+    # get nsamples
+    nsample = config['loss_args'].get('num_samples_template', 12)
+
+    # Load model
     try:
         model.load_state_dict(state_dict)
     except:
@@ -123,57 +105,45 @@ def main(config, args):
     total_metrics = torch.zeros(len(metric_fns))
 
     with torch.no_grad():
+        # Store all stuff here
+        vesselness = []
+        alloutputs = []
+
         for i, data in enumerate(tqdm(data_loader)):
-            #data, target = data.to(device), target.to(device)
+            ## Get output from model
             data = to_device(data, device)
             output = model(data)
-            #
-            # save sample images, or do something with output here
-            #
+            ## Get vessels
             vessel_type = config.get('vessel_type', 'light')
             mask = data.get('mask')
+            if mask is not None:
+                mask = mask.cpu()
 
-            # Change this for different vesselness modes
-            if True:
-                ves = vesselfunc(data['image'], output, vtype=vessel_type, mask=mask, is_crosscorr=args.crosscorr, parallel_scale=parallel_scale, sv_range=sv_range)
-                ves = ves.data.cpu().numpy()
-                ves = smooth(ves, s)
-            else:
-                ves = vesselfunc(data['image'], output, vtype=vessel_type, mask=mask, is_crosscorr=False, parallel_scale=parallel_scale, sv_range=sv_range)
-                ves = smooth(ves, s)
-                ves = v2_avg(ves, v2, vtype='light', mask=mask, is_crosscorr=False, parallel_scale=parallel_scale, sv_range=sv_range)
-                ves = ves.data.cpu().numpy()
 
-            # Move outputs to CPU
+            ## Change this for different vesselness modes
+            ves = vesselfunc(data['image'], output, nsample=nsample, vtype=vessel_type, mask=mask, is_crosscorr=args.crosscorr, parallel_scale=parallel_scale, sv_range=sv_range)
+            ves = ves.data.cpu().numpy()
+            ves = smooth(ves, s)
+
+            ## Put all outputs to cpu
             for k, v in output.items():
                 try:
                     output[k] = v.cpu()
                 except:
                     pass
 
+            vesselness.append(ves)
+            alloutputs.append(output)
 
-            # Add the other frangi-like term
-            '''
-            ves2 = v2transpose_vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, mask=mask, is_crosscorr=False)
-            ves2 = ves2.data.cpu().numpy()
-            ves = ves*np.exp(-ves2)
-            '''
 
-            # computing loss, metrics on test set
-            with open('{}_vesselness.pkl'.format(trainstr), 'wb') as fi:
-                pkl.dump(ves, fi)
+        # computing loss, metrics on test set
+        with open('{}_vesselness_3d.pkl'.format(trainstr), 'wb') as fi:
+            pkl.dump(vesselness, fi)
 
-            # store everything in another pickle file
-            with open('{}_analysis.pkl'.format(trainstr), 'wb') as fi:
-                torch.save({'data': data, 'output': output}, fi)
+        # store everything in another pickle file
+        with open('{}_analysis_3d.pkl'.format(trainstr), 'wb') as fi:
+            torch.save(alloutputs, fi)
 
-            I = np.random.randint(20)
-            plt.subplot(121)
-            plt.imshow(data['image'].cpu()[I, 0])
-            plt.subplot(122)
-            plt.imshow(ves[I, 0])
-            plt.savefig('label.png')
-            break
 
 
 if __name__ == '__main__':

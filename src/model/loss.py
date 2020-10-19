@@ -1196,10 +1196,8 @@ def v1_sq_vesselness(image, output, nsample=12, vtype='light', mask=None, percen
 
 def v1_sqmax_vesselness_test(image, output, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2, sv_range=None):
     v = v1_sqmax_vesselness(image, output, nsample, vtype, mask, percentile, is_crosscorr, v1, parallel_scale)
-    #v = torch.exp(v)
 
     ves = output['vessel'][:, 2:4]
-
     #### Additional dissimilarity
     total_sim = 0.0
     for sv in np.linspace(-parallel_scale*4, parallel_scale*4, nsample):
@@ -1379,6 +1377,23 @@ def v1_sqmax_jointvesselness_test(image, output, nsample=12, vtype='light', mask
     return v*total_sim
 
 
+def v1_sqmax_bifurconly_test(image, output, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2, sv_range=None):
+    '''
+    Bifurcation loss only
+    '''
+    vessel = v1_sqmax_bifurc(image, output, nsample, vtype, mask, percentile, is_crosscorr, None, parallel_scale, sv_range)
+    #### Additional dissimilarity
+    ves = output['vessel'][:, 2:4]
+    total_sim = 0.0
+    for sv in np.linspace(0, parallel_scale*4, nsample):
+        vt = resample_from_flow_2d(ves+0, sv*ves)
+        sim = (torch.abs(F.cosine_similarity(ves+0, vt)))
+        total_sim = total_sim + sim
+
+    total_sim = total_sim/nsample
+    total_sim = total_sim[:, None]
+    return vessel*total_sim
+
 
 def vessel_loss_2dv1_sq(output, data, config):
     return vessel_loss_2dv1_sqmax(output, data, config, maxfilter=False)
@@ -1390,7 +1405,14 @@ def vessel_loss_2dv1_bifurcmax(output, data, config):
     '''
     args = config['loss_args']
     bifurc_mode = args.get('bifurc_mode')
-    assert bifurc_mode in ['joint', 'detach']
+    assert bifurc_mode in ['joint', 'detach', 'only']
+    return vessel_loss_2dv1_sqmax(output, data, config)
+
+
+def vessel_loss_2dv1_bifurconlymax(output, data, config):
+    args = config['loss_args']
+    bifurc_mode = args.get('bifurc_mode')
+    assert bifurc_mode == 'only'
     return vessel_loss_2dv1_sqmax(output, data, config)
 
 
@@ -1481,12 +1503,12 @@ def vessel_loss_2dv1_sqmax(output, data, config, maxfilter=True):
             if bifurc_mode is None:
                 loss = loss + l_template * (1 - (mask*vessel_conv).mean())
             else:
-                # There is a bifurcation mode (either joint or detach)
+                # There is a bifurcation mode (either joint or detach or only)
                 if bifurc_mode == 'joint':
                     # Joint mode, take weighted average of vesselness and optimize this directly
                     jointv = jointvesselnessfun(image, output, num_samples_template, vessel_type, is_crosscorr=is_crosscorr, parallel_scale=parallel_scale, sv_range=sv_range)
                     loss = loss + l_template * (1 - (mask*jointv).mean())
-                else:
+                elif bifurc_mode == 'detach':
                     bifurcves = bifurcfun(image, output, num_samples_template, vessel_type, is_crosscorr=is_crosscorr, parallel_scale=parallel_scale, sv_range=sv_range)
                     # Add bifurc loss and normal vessels separately
                     loss = loss + l_template * (1 - (mask*vessel_conv).mean())
@@ -1496,6 +1518,11 @@ def vessel_loss_2dv1_sqmax(output, data, config, maxfilter=True):
                     bwt_loss =  bwt * bifurcves.detach() + (1 - bwt) * vessel_conv.detach()
                     # Calculate loss
                     loss = loss + l_bifurcwt * (1 - (mask*bwt_loss).mean())
+                elif bifurc_mode == 'only':
+                    bifurcves = bifurcfun(image, output, num_samples_template, vessel_type, is_crosscorr=is_crosscorr, parallel_scale=parallel_scale, sv_range=sv_range)
+                    loss = loss + l_template * (1 - (mask*bifurcves).mean())
+                else:
+                    raise NotImplementedError
 
 
         # Vessel intensity consistency loss

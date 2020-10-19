@@ -97,10 +97,11 @@ def get_orthogonal_basis(v1, scale_vector=True):
     return v2, v3
 
 
-def v13d_sq_vesselness(image, v1, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, parallel_scale=2):
+def v13d_sq_vesselness(image, output, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, parallel_scale=2, sv_range=None):
     # Take actual Hessian from the direction specified by v1
     # Find v2 and v3 first
     # Create a v2 using the minimum abs value from v1 index
+    v1 = output['vessel'][:, :3]
     v2, v3 = get_orthogonal_basis(v1)
 
     # Keep track of all values, and add to response
@@ -142,7 +143,24 @@ def v13d_sq_vesselness(image, v1, nsample=12, vtype='light', mask=None, percenti
     return response
 
 
-def v13d_sqmax_vesselness(image, v1, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, parallel_scale=2):
+def v13d_sq_vesselness_test(image, output, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, parallel_scale=2, sv_range=None):
+    ''' Put additional dissimilarity term '''
+    v = v13d_sq_vesselness(image, output, nsample, vtype, mask, percentile, is_crosscorr, parallel_scale, sv_range)
+    ves = output['vessel'][:, :3]
+    #### Additional dissimilarity
+    total_sim = 0.0
+    for sv in np.linspace(-parallel_scale*4, parallel_scale*4, nsample):
+        vt = resample_from_flow_3d(ves+0, sv*ves)
+        sim = (torch.abs(F.cosine_similarity(ves+0, vt)))
+        total_sim = total_sim + sim
+
+    total_sim = total_sim/nsample
+    total_sim = total_sim[:, None]
+
+    return v*total_sim
+
+
+def v13d_sqmax_vesselness(image, output, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, parallel_scale=2):
     pass
 
 def vessel_loss_3d(output, data, config,):
@@ -214,7 +232,7 @@ def vessel_loss_3dmax(output, data, config, maxfilter=True):
     # Check profile by taking convolution with the template
     vessel_conv = 0.0
     if l_template:
-        vessel_conv = vesselnessfun(image, v1, num_samples_template, vessel_type, is_crosscorr=is_crosscorr, parallel_scale=parallel_scale)
+        vessel_conv = vesselnessfun(image, output, num_samples_template, vessel_type, is_crosscorr=is_crosscorr, parallel_scale=parallel_scale)
         #print(vessel_conv.min(), vessel_conv.max())
         loss = loss + l_template * (1 - (mask*vessel_conv).mean())
 
