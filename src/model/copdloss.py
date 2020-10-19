@@ -160,8 +160,69 @@ def v13d_sq_vesselness_test(image, output, nsample=12, vtype='light', mask=None,
     return v*total_sim
 
 
-def v13d_sqmax_vesselness(image, output, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, parallel_scale=2):
-    pass
+def v13d_sqmax_vesselness(image, output, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, parallel_scale=2, sv_range=None):
+    # Take actual Hessian from the direction specified by v1
+    # Find v2 and v3 first
+    # Create a v2 using the minimum abs value from v1 index
+    v1 = output['vessel'][:, :3]
+    v2, v3 = get_orthogonal_basis(v1)
+
+    # Keep track of all values, and add to appropriate cross section
+    response = [0.0]*8
+    i_range = []
+    for i in range(8):
+        i_range.append([])
+
+    # For each position, add to profile
+    for sv in np.linspace(-parallel_scale, parallel_scale, nsample):
+        # Get perpendicular profile
+        for ang, s in itertools.product(np.arange(4), np.linspace(-2, 2, nsample)):
+            # Calculate filter, theta, and actual direction
+            filt = 2*int(abs(s) < 1) - 1
+            theta = np.pi/4*ang
+            vperp = np.cos(theta)*v2 + np.sin(theta)*v3
+            # Get image
+            i_val = resample_from_flow_3d(image, s*vperp + sv*v1)
+
+            ## Determine index
+            idx = ang + 4*int(s < 0)
+            response[idx] = response[idx] + i_val*filt
+            if is_crosscorr:
+                i_range[idx].append(i_val.detach()[:, None])
+
+    if is_crosscorr:
+        for idx in range(8):
+            # Compute std
+            i_range[idx] = torch.cat(i_range[idx], 1)
+            i_std = i_range[idx].std(1, unbiased=False) + 1e-7
+            # Divide correlation by std
+            response[idx] = response[idx] / i_std / (nsample**2) * 2
+            # Check assertion
+            val = (-1 <= response[idx])*(response[idx] <= 1)
+            val = (~val).sum().item()
+            assert val == 0, '{} {}'.format(val, np.prod(list(response.shape)))
+
+    # Take weakest response over a ridge
+    weakestresponse = [0.0]*8
+    for i in range(8):
+        for j in range(i, i+4):
+            weakestresponse[i] = weakestresponse[i] + response[j%8][None]/4.0
+
+    # Size [8, Batch, C, H, W, D]
+    weakestresponse = torch.cat(weakestresponse, 0)
+
+    # Correct the response accordingly
+    if vtype == 'light':
+        weakestresponse = torch.min(weakestresponse, 0).values
+    elif vtype == 'dark':
+        weakestresponse = torch.min(-weakestresponse, 0).values
+    elif vtype == 'both':
+        weakestresponse = torch.min(2*torch.abs(weakestresponse), 0).values
+    else:
+        raise NotImplementedError('{} type not supported in vesseltype'.format(vtype))
+
+    return weakestresponse
+
 
 def vessel_loss_3d(output, data, config,):
     return vessel_loss_3dmax(output, data, config, False)
