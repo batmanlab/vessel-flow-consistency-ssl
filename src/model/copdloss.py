@@ -160,6 +160,23 @@ def v13d_sq_vesselness_test(image, output, nsample=12, vtype='light', mask=None,
     return v*total_sim
 
 
+def v13d_sqmax_vesselness_test(image, output, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, parallel_scale=2, sv_range=None):
+    ''' Put additional dissimilarity term '''
+    v = v13d_sqmax_vesselness(image, output, nsample, vtype, mask, percentile, is_crosscorr, parallel_scale, sv_range)
+    ves = output['vessel'][:, :3]
+    #### Additional dissimilarity
+    total_sim = 0.0
+    for sv in np.linspace(-parallel_scale*4, parallel_scale*4, nsample):
+        vt = resample_from_flow_3d(ves+0, sv*ves)
+        sim = (torch.abs(F.cosine_similarity(ves+0, vt)))
+        total_sim = total_sim + sim
+
+    total_sim = total_sim/nsample
+    total_sim = total_sim[:, None]
+
+    return v*total_sim
+
+
 def v13d_sqmax_vesselness(image, output, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, parallel_scale=2, sv_range=None):
     # Take actual Hessian from the direction specified by v1
     # Find v2 and v3 first

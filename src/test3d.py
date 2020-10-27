@@ -58,6 +58,8 @@ def main(config, args):
     elif config.config['loss'] == 'vessel_loss_3d':
         #vesselfunc = v13d_sq_vesselness_test
         vesselfunc = v13d_sq_vesselness
+    elif config.config['loss'] == 'vessel_loss_3dmax':
+        vesselfunc = v13d_sqmax_vesselness
     else:
         assert False, 'Unknown loss function {}'.format(config['loss'])
     print(vesselfunc)

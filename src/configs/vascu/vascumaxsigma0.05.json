@@ -1,5 +1,5 @@
 {
-    "name": "vascusigma0.4",
+    "name": "vascumaxsigma0.05",
     "n_gpu": 2,
     "arch": {
         "type": "UNet3D",
@@ -16,7 +16,7 @@
         "args": {
             "data_dir": "/pghbio/dbmi/batmanlab/rohit33/VascuSynth/",
             "batch_size": 2,
-            "sigma": 0.4,
+            "sigma": 0.05,
             "shuffle": true,
             "validation_split": 0,
             "num_workers": 4
@@ -31,7 +31,7 @@
             "amsgrad": true
         }
     },
-    "loss": "vessel_loss_3d",
+    "loss": "vessel_loss_3dmax",
     "loss_args": {
         "loss_intensity": "L2",
         "lambda_template": 1,
@@ -54,12 +54,12 @@
         }
     },
     "trainer": {
-        "epochs": 1500,
+        "epochs": 500,
         "save_dir": "/pghbio/dbmi/batmanlab/rohit33/saved_models",
         "save_period": 10,
         "verbosity": 2,
         "monitor": "min val_loss",
-        "early_stop": 2000,
+        "early_stop": 1000,
         "quiver_scale": 2,
         "normalize_flow": true,
         "normalize_flow_rev": true,

@@ -1,5 +1,5 @@
 {
-    "name": "vascusigma0.4",
+    "name": "vascusigma0.5",
     "n_gpu": 2,
     "arch": {
         "type": "UNet3D",
@@ -16,7 +16,7 @@
         "args": {
             "data_dir": "/pghbio/dbmi/batmanlab/rohit33/VascuSynth/",
             "batch_size": 2,
-            "sigma": 0.4,
+            "sigma": 0.5,
             "shuffle": true,
             "validation_split": 0,
             "num_workers": 4
