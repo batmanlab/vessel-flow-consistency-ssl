@@ -54,9 +54,12 @@ class COPDTrainer(BaseTrainer):
         # TODO
         if self.config['loss'] == 'vessel_loss_3d':
             self.vesselfunc = v13d_sq_vesselness
+        elif self.config['loss'] == 'vessel_loss_3d_bifurc':
+            self.vesselfunc = v13d_sq_jointvesselness
         else:
             self.vesselfunc = v13d_sqmax_vesselness
         print("Using vesselness function", self.vesselfunc)
+
 
     def _to_device(self, data):
         for k, v in data.items():

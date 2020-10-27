@@ -385,6 +385,7 @@ class Abstract3DUNet(nn.Module):
         self.vessel_scale_factor = vessel_scale_factor
         self.out_channels = out_channels
 
+
         if isinstance(f_maps, int):
             f_maps = number_of_features_per_level(f_maps, num_levels=num_levels)
 
@@ -441,6 +442,14 @@ class Abstract3DUNet(nn.Module):
         self.final_conv = nn.Conv3d(f_maps[0], out_channels*4//3, 1)
         self.recon_conv = nn.Conv3d(f_maps[0], in_channels, 1)
 
+        # birfurcation
+        self.bifurc = False
+        if kwargs.get('bifurc'):
+            self.bifurc = True
+            self.branch1_conv = nn.Conv3d(f_maps[0], out_channels*4//3, 1)
+            self.branch2_conv = nn.Conv3d(f_maps[0], out_channels*4//3, 1)
+
+
         if is_segmentation:
             # semantic segmentation problem
             if final_sigmoid:
@@ -450,6 +459,17 @@ class Abstract3DUNet(nn.Module):
         else:
             # regression problem
             self.final_activation = None
+
+
+    def getvec(self, v):
+        vnums = self.out_channels // 3
+        ves = v[:, :vnums*3]
+        scale = v[:, -vnums:]
+        scale = torch.sigmoid(scale)*self.vessel_scale_factor + self.min_scale
+        # divide by norm and multiply scale
+        norm = torch.norm(ves, dim=1, keepdim=True) + 1e-10
+        ves = scale*ves/norm
+        return ves
 
 
     def forward(self, inp):
@@ -472,21 +492,25 @@ class Abstract3DUNet(nn.Module):
             x = decoder(encoder_features, x)
 
         recon = self.recon_conv(x)
-        x = self.final_conv(x)
+
+        # Get vessels
+        ves = self.final_conv(x)
+        ves = self.getvec(ves)
 
         # Get scales
-        vnums = self.out_channels // 3
-        ves = x[:, :vnums*3]
-        scale = x[:, -vnums:]
-        scale = torch.sigmoid(scale)*self.vessel_scale_factor + self.min_scale
-        # divide by norm and multiply scale
-        norm = torch.norm(ves, dim=1, keepdim=True) + 1e-10
-        ves = scale*ves/norm
-        x =  {
+        out =  {
             "vessel": ves,
             "recon": recon,
         }
-        return x
+
+        # Save bifurcation
+        if self.bifurc:
+            br1 = self.branch1_conv(x)
+            br2 = self.branch2_conv(x)
+            out['branch1'] = self.getvec(br1)
+            out['branch2'] = self.getvec(br2)
+
+        return out
 
 
 class UNet3D(Abstract3DUNet):

@@ -97,6 +97,39 @@ def get_orthogonal_basis(v1, scale_vector=True):
     return v2, v3
 
 
+def get_acute_projection(v, v1):
+    '''
+    Get the projection of v where v1 is the reference, also normalize it
+    '''
+    sign = F.cosine_similarity(v, v1)[:, None].detach()
+    sign = (sign >= 0).float()*2 - 1
+    v = sign*v
+    v = normalize_vector(v)
+    # Get scale
+    scale = v1.norm(dim=1, keepdim=True)
+    v = scale*v
+    return v
+
+
+def v13d_sq_jointvesselness(image, output, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, parallel_scale=2, sv_range=None):
+    '''
+    Consider 3 directions, the main vessel direction, and 2 extra directions for birfurcations
+    '''
+    output1 = {}
+    output2 = {}
+    v1 = output['vessel'][:, :3]
+    branch1 = get_acute_projection(output['branch1'], -v1)
+    branch2 = get_acute_projection(output['branch2'], -v1)
+    # Get dicts from v1
+    output1['vessel'] = branch1
+    output2['vessel'] = branch2
+    # Get vesselness at different sv_range
+    v1 = v13d_sq_vesselness(image, output, nsample, vtype, mask, percentile, is_crosscorr, parallel_scale, (0, parallel_scale))
+    v2 = v13d_sq_vesselness(image, output1, nsample, vtype, mask, percentile, is_crosscorr, parallel_scale, (0, parallel_scale))
+    v3 = v13d_sq_vesselness(image, output2, nsample, vtype, mask, percentile, is_crosscorr, parallel_scale, (0, parallel_scale))
+    return (v1 + v2 + v3)/3.0
+
+
 def v13d_sq_vesselness(image, output, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, parallel_scale=2, sv_range=None):
     # Take actual Hessian from the direction specified by v1
     # Find v2 and v3 first
@@ -104,10 +137,14 @@ def v13d_sq_vesselness(image, output, nsample=12, vtype='light', mask=None, perc
     v1 = output['vessel'][:, :3]
     v2, v3 = get_orthogonal_basis(v1)
 
+    # Get default sv_range
+    if sv_range is None:
+        sv_range = (-parallel_scale, parallel_scale)
+
     # Keep track of all values, and add to response
     i_range = []
     response = 0.0
-    for sv in np.linspace(-parallel_scale, parallel_scale, nsample):
+    for sv in np.linspace(sv_range[0], sv_range[1], nsample):
         # Get perpendicular profile
         for ang, s in itertools.product(np.arange(4), np.linspace(-2, 2, nsample)):
             # Calculate filter, theta, and actual direction
@@ -244,6 +281,17 @@ def v13d_sqmax_vesselness(image, output, nsample=12, vtype='light', mask=None, p
 def vessel_loss_3d(output, data, config,):
     return vessel_loss_3dmax(output, data, config, False)
 
+
+def vessel_loss_3d_bifurc(output, data, config):
+    '''
+    Vessel birfurc with average from everywhere
+    '''
+    args = config['loss_args']
+    bifurc_mode = args.get('bifurc_mode')
+    assert bifurc_mode == 'only'
+    return vessel_loss_3d(output, data, config,)
+
+
 def vessel_loss_3dmax(output, data, config, maxfilter=True):
     '''
     Master loss function of vessel self supervised learning
@@ -268,9 +316,15 @@ def vessel_loss_3dmax(output, data, config, maxfilter=True):
 
     parallel_scale = args.get('parallel_scale', 2)
 
+    # Bifurcation parameters
+    bifurc_mode = args.get('bifurc_mode')
+    # l_bifurcwt = args.get('lambda_bifurcwt')
+    sv_range = args.get('sv_range')
+
     # Check for max filter
     if maxfilter==False:
         vesselnessfun = v13d_sq_vesselness
+        jointvesselfun = v13d_sq_jointvesselness
     else:
         vesselnessfun = v13d_sqmax_vesselness
 
@@ -310,13 +364,21 @@ def vessel_loss_3dmax(output, data, config, maxfilter=True):
     # Check profile by taking convolution with the template
     vessel_conv = 0.0
     if l_template:
-        vessel_conv = vesselnessfun(image, output, num_samples_template, vessel_type, is_crosscorr=is_crosscorr, parallel_scale=parallel_scale)
-        #print(vessel_conv.min(), vessel_conv.max())
-        loss = loss + l_template * (1 - (mask*vessel_conv).mean())
+        if bifurc_mode is None:
+            vessel_conv = vesselnessfun(image, output, num_samples_template, vessel_type, is_crosscorr=is_crosscorr, parallel_scale=parallel_scale)
+            loss = loss + l_template * (1 - (mask*vessel_conv).mean())
+        else:
+            vessel_conv = jointvesselfun(image, output, num_samples_template, vessel_type, is_crosscorr=is_crosscorr, parallel_scale=parallel_scale)
+            loss = loss + l_template * (1 - (mask*vessel_conv).mean())
 
     # Vessel intensity consistency loss
     if l_intensity:
-        for scale in np.linspace(-parallel_scale/2., parallel_scale/2., 5):
+        if bifurc_mode is None:
+            lower = -parallel_scale/2.0
+        else:
+            lower = 0
+
+        for scale in np.linspace(lower, parallel_scale/2., 5):
             # Check for both directions for same intensity -> this will help in centerline prediction
             i_parent = resample_from_flow_3d(vessel_conv, scale*v1)
             loss = loss + l_intensity * (L_loss(vessel_conv, i_parent, mask=mask))/5.0
