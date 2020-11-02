@@ -7,6 +7,7 @@ import numpy as np
 from tqdm import tqdm
 import os
 import sys
+import xml.etree.ElementTree as ET
 from data_loader.datasets import DriveDataset, StareDataset
 from skimage.filters import frangi
 from sklearn import metrics
@@ -19,11 +20,30 @@ parser.add_argument('--method', type=str, default='frangi')
 parser.add_argument('--dir', type=str, default='.')
 parser.add_argument('--dataset', type=str, default='drive')
 parser.add_argument('--threshold', type=float, default=None)
+parser.add_argument('--mode', type=str, default='test')
+
+def get_bbox_anno(filename):
+    tree = ET.parse(filename)
+    root = tree.getroot()
+    objects = list(filter(lambda x: x.tag == 'object', list(root)))
+    bboxobj = list(map(lambda x: list(x), objects))
+    bboxobj = [x for sublist in bboxobj for x in sublist]
+    bboxobj = list(filter(lambda x: x.tag == 'bndbox', bboxobj))
+
+    bboxes = []
+    for box in bboxobj:
+        xy = list(box)
+        d = dict()
+        for _xy in xy:
+            d[_xy.tag] = int(_xy.text)
+        bbox = [d['xmin'], d['xmax'], d['ymin'], d['ymax']]
+        bboxes.append(bbox)
+    return bboxes
+
 
 def frangi_vesselness(img, i):
     ves = frangi(img, np.linspace(1, 5, 5), black_ridges=True).astype(np.float32)
     return ves
-
 
 def vesselness_file(filename):
     with open(filename, 'rb') as fi:
@@ -49,8 +69,11 @@ def multiply_mask(ves, mask):
 
 
 def dice_score(a, b):
+    if a.size == 0:
+        return np.nan
+
     num = (2*a*b).mean()
-    den = a.mean() + b.mean()
+    den = a.mean() + b.mean() + 1e-100
     return num/den
 
 
@@ -103,6 +126,37 @@ def sensitivity(v, gt):
     tp = ((v == 1)&(gt == 1)).mean()
     fn = ((v == 0)&(gt == 1)).mean()
     return tp/(tp + fn)
+
+
+def get_anno_metrics(ds, gt, args, threshold):
+    # Print dice for annotations
+    if args.method == 'frangi':
+        vfunc = frangi_vesselness
+    else:
+        vfunc = vesselness_file(os.path.join(args.dir, 'test_vesselness.pkl'))
+
+    dice = []
+    for i in range(10):
+        annoname = "/pghbio/dbmi/batmanlab/rohit33/DRIVE/test/branchannotations/{:02d}_manual1.xml".format(i+1)
+        #print(annoname)
+        bboxes = get_bbox_anno(annoname)
+        ## Get dataloader
+        img = ds[i]['image'][0].data.cpu().numpy()
+        lab = (gt[i]['image'][0].data.cpu().numpy() > 0.5).astype(float)
+        mask = ds[i]['mask'][0].data.cpu().numpy()
+        # Get vesselness
+        ves = vfunc(img, i)
+        ves = multiply_mask(ves, mask)
+        vthres = (ves >= threshold).astype(float)
+        # Take bounding boxes
+        for xmin, xmax, ymin, ymax in bboxes:
+            vpred = vthres[ymin:ymax+1, xmin:xmax+1]
+            vgt = lab[ymin:ymax+1, xmin:xmax+1]
+            _dice = dice_score(vpred, vgt)
+            if not np.isnan(_dice):
+                dice.append(_dice)
+    print("Mean: {:.5f}, Std: {:.5f}".format(np.mean(dice), np.std(dice)))
+
 
 
 def print_all_test_metrics(ds, gt, args, threshold):
@@ -161,7 +215,12 @@ def main():
 
     # Compute all metrics
     print(threshold)
-    print_all_test_metrics(testdataset, testgtdataset, args, threshold)
+    if args.mode == 'test':
+        print_all_test_metrics(testdataset, testgtdataset, args, threshold)
+    elif args.mode == 'anno':
+        get_anno_metrics(testdataset, testgtdataset, args, threshold)
+    else:
+        raise NotImplementedError
 
 
 
