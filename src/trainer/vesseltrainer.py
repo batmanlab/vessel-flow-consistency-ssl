@@ -60,6 +60,8 @@ class VesselTrainer(BaseTrainer):
             self.vesselfunc = v1_sqmax_jointvesselness
         elif self.config['loss'] == 'vessel_loss_2dv1_bifurconlymax':
             self.vesselfunc = v1_sqmax_bifurconly_test
+        elif self.config['loss'] == 'self_supervised_loss':
+            self.vesselfunc = self_supervised_image
         else:
             assert False, 'Unknown loss function {}'.format(self.config['loss'])
 
@@ -118,7 +120,10 @@ class VesselTrainer(BaseTrainer):
             # Create outputviz to have detached values
             outputviz = {}
             for k, v in output.items():
-                outputviz[k] = v.detach().cpu()
+                try:
+                    outputviz[k] = v.detach().cpu()
+                except:
+                    outputviz[k] = v
 
             # Every few steps, add some images
             if epoch % self.img_log_step == 0 and batch_idx == 0:
@@ -193,7 +198,10 @@ class VesselTrainer(BaseTrainer):
                 # Create outputviz to have detached values
                 outputviz = {}
                 for k, v in output.items():
-                    outputviz[k] = v.detach().cpu()
+                    try:
+                        outputviz[k] = v.detach().cpu()
+                    except:
+                        outputviz[k] = v
 
                 if epoch % self.img_log_step == 0 and batch_idx == 0:
                     self.writer.add_image('input', make_grid(0.5 + 0.5*data['image'].cpu(), nrow=4, normalize=True))

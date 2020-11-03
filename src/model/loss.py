@@ -12,6 +12,23 @@ def null_fn(*args):
 #print_fn = print
 print_fn = null_fn
 
+def self_supervised_loss(output, data, config):
+    '''
+    Simply take reconstruction loss of image to ground truth
+    '''
+    recon = output['recon']
+    gt = data['gt']
+    loss = (gt - recon)**2
+    loss = loss.mean()
+    return loss
+
+def self_supervised_image(image, output, *args, **kwargs):
+    """
+    Just return the reconstructed image
+    """
+    return output['recon']
+
+
 # Output vesselness
 def v2vesselness(image, ves, nsample=20, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1=None, parallel_scale=2):
     response = 0.0
@@ -1523,7 +1540,6 @@ def vessel_loss_2dv1_sqmax(output, data, config, maxfilter=True):
                     loss = loss + l_template * (1 - (mask*bifurcves).mean())
                 else:
                     raise NotImplementedError
-
 
         # Vessel intensity consistency loss
         if l_intensity:
