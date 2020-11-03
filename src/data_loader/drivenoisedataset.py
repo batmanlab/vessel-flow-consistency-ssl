@@ -106,7 +106,7 @@ class DriveNoiseDataset(Dataset):
 
         img = img[None]
         # Return [1, H, W] image and [1, H, W]
-        noisy = img + 0.05*np.random.randn(*img.shape)
+        noisy = img + 0.1*np.random.randn(*img.shape)
 
         return {
             'gt': torch.FloatTensor(img),
