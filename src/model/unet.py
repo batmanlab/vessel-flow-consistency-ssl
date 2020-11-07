@@ -111,6 +111,14 @@ class UNet(nn.Module):
             self.bangle = OutConv(64, 2)
             self.bwt = OutConv(64, 1)
 
+    def reinit_last_layers(self):
+        # Reinit last layers
+        print("Re initializing last layer")
+        nn.init.normal_(self.outv.conv.weight.data)
+        nn.init.normal_(self.outr.conv.weight.data)
+        nn.init.normal_(self.outv.conv.weight.data)
+        nn.init.normal_(self.outr.conv.weight.data)
+
     def forward(self, x):
         x1 = x['image']
         x1 = self.inc(x1)

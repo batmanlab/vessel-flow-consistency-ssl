@@ -42,7 +42,7 @@ class BaseTrainer:
 
         self.checkpoint_dir = config.save_dir
 
-        # setup visualization writer instance                
+        # setup visualization writer instance
         self.writer = TensorboardWriter(config.log_dir, self.logger, cfg_trainer['tensorboard'])
 
         if config.resume is not None:
@@ -143,6 +143,7 @@ class BaseTrainer:
             torch.save(state, best_path)
             self.logger.info("Saving current best: model_best.pth ...")
 
+
     def _resume_checkpoint(self, resume_path):
         """
         Resume from saved checkpoints
@@ -152,14 +153,29 @@ class BaseTrainer:
         resume_path = str(resume_path)
         self.logger.info("Loading checkpoint: {} ...".format(resume_path))
         checkpoint = torch.load(resume_path)
-        self.start_epoch = checkpoint['epoch'] + 1
+        #self.start_epoch = checkpoint['epoch'] + 1
+        self.start_epoch = 1
         self.mnt_best = checkpoint['monitor_best']
 
         # load architecture params from checkpoint.
         if checkpoint['config']['arch'] != self.config['arch']:
             self.logger.warning("Warning: Architecture configuration given in config file is different from that of "
                                 "checkpoint. This may yield an exception while state_dict is being loaded.")
-        self.model.load_state_dict(checkpoint['state_dict'])
+
+        # Load state dict
+        module = True
+        try:
+            self.model.load_state_dict(checkpoint['state_dict'])
+            module = False
+        except:
+            self.model.module.load_state_dict(checkpoint['state_dict'])
+            module = True
+
+        # clear last layers
+        if module:
+            self.model.module.reinit_last_layers()
+        else:
+            self.model.reinit_last_layers()
 
         # load optimizer state from checkpoint only when optimizer type is not changed.
         if checkpoint['config']['optimizer']['type'] != self.config['optimizer']['type']:

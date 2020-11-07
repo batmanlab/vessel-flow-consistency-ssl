@@ -28,6 +28,17 @@ class DRIVEDataLoader(BaseDataLoader):
         super().__init__(self.dataset, batch_size, shuffle, validation_split, num_workers)
 
 
+class DRIVESupDataloader(BaseDataLoader):
+    '''
+    Dataloader for DRIVE dataset
+    '''
+    def __init__(self, data_dir, batch_size, shuffle=True, validation_split=0.0, num_workers=1, training=True, toy=False, augment=True, preprocessing=False, idx=None):
+        self.data_dir = data_dir
+        self.dataset = DriveSupDataset(self.data_dir, train=training, toy=toy, preprocessing=preprocessing, \
+                                    augment=augment, idx=idx)
+        super().__init__(self.dataset, batch_size, shuffle, validation_split, num_workers)
+
+
 class DRIVEContextDataLoader(BaseDataLoader):
     '''
     Dataloader for DRIVE dataset (noise)
@@ -77,6 +88,17 @@ class STAREDataLoader(BaseDataLoader):
     def __init__(self, data_dir, batch_size, shuffle=True, validation_split=0.0, num_workers=1, training=True, toy=False, augment=True, preprocessing=False, idx=None):
         self.data_dir = data_dir
         self.dataset = StareDataset(self.data_dir, train=training, toy=toy, preprocessing=preprocessing, \
+                                    augment=augment, idx=idx)
+        super().__init__(self.dataset, batch_size, shuffle, validation_split, num_workers)
+
+
+class STARESupDataLoader(BaseDataLoader):
+    '''
+    Dataloader for DRIVE dataset
+    '''
+    def __init__(self, data_dir, batch_size, shuffle=True, validation_split=0.0, num_workers=1, training=True, toy=False, augment=True, preprocessing=False, idx=None):
+        self.data_dir = data_dir
+        self.dataset = StareSupDataset(self.data_dir, train=training, toy=toy, preprocessing=preprocessing, \
                                     augment=augment, idx=idx)
         super().__init__(self.dataset, batch_size, shuffle, validation_split, num_workers)
 

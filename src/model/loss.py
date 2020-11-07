@@ -22,6 +22,13 @@ def self_supervised_loss(output, data, config):
     loss = loss.mean()
     return loss
 
+
+def cross_entropy_loss(output, data, config):
+    ''' Cross entropy between ground truth and predicted value '''
+    loss = nn.BCEWithLogitsLoss()(output['recon'], data['gt']).mean()
+    return loss
+
+
 def self_supervised_image(image, output, *args, **kwargs):
     """
     Just return the reconstructed image
