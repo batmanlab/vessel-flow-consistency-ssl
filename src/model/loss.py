@@ -28,6 +28,13 @@ def cross_entropy_loss(output, data, config):
     loss = nn.BCEWithLogitsLoss()(output['recon'], data['gt']).mean()
     return loss
 
+def dice_loss(output, data, config):
+    ''' Dice loss between ground truth and predicted value '''
+    pred = F.sigmoid(output['recon'])
+    gt = data['gt'].float()
+    num = (2 * pred * gt).mean()
+    den = (gt.mean() + pred.mean() + 1e-10)
+    return num/den
 
 def self_supervised_image(image, output, *args, **kwargs):
     """

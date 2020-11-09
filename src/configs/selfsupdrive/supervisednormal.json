@@ -31,7 +31,7 @@
             "amsgrad": true
         }
     },
-    "loss": "cross_entropy_loss",
+    "loss": "dice_loss",
     "loss_args": {
         "num_directions": 2,
         "eps": 1e-1,
