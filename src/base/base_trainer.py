@@ -165,11 +165,15 @@ class BaseTrainer:
         # Load state dict
         module = True
         try:
+            print("Trying to load with no module")
             self.model.load_state_dict(checkpoint['state_dict'])
             module = False
+            print("Loaded with no module")
         except:
+            print("Trying to load with module")
             self.model.module.load_state_dict(checkpoint['state_dict'])
             module = True
+            print("Loaded with module")
 
         # clear last layers
         if module:

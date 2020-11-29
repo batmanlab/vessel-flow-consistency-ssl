@@ -62,6 +62,8 @@ class VesselTrainer(BaseTrainer):
             self.vesselfunc = v1_sqmax_bifurconly_test
         elif self.config['loss'] == 'self_supervised_loss':
             self.vesselfunc = self_supervised_image
+        elif self.config['loss'] == 'colorization_loss':
+            self.vesselfunc = self_supervised_image
         elif self.config['loss'] == 'dice_loss':
             self.vesselfunc = self_supervised_image
         else:

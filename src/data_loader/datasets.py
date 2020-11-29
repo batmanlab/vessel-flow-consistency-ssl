@@ -1,6 +1,7 @@
 from data_loader.drivedataset import DriveDataset, DriveContrastDataset
 from data_loader.drivenoisedataset import DriveNoiseDataset
 from data_loader.drivecontextdataset import DriveContextDataset
+from data_loader.drivecolordataset import DriveColorDataset
 from data_loader.drivesupdataset import DriveSupDataset
 from data_loader.staredataset import StareDataset
 from data_loader.staresupdataset import StareSupDataset

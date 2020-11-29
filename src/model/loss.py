@@ -23,10 +23,22 @@ def self_supervised_loss(output, data, config):
     return loss
 
 
+def colorization_loss(output, data, config):
+    '''
+    Colorize the image
+    '''
+    recon = output['vessel'][:, :3]
+    gt = data['gt']
+    loss = (gt - recon)**2
+    loss = loss.mean()
+    return loss
+
+
 def cross_entropy_loss(output, data, config):
     ''' Cross entropy between ground truth and predicted value '''
     loss = nn.BCEWithLogitsLoss()(output['recon'], data['gt']).mean()
     return loss
+
 
 def dice_loss(output, data, config):
     ''' Dice loss between ground truth and predicted value '''
@@ -34,7 +46,8 @@ def dice_loss(output, data, config):
     gt = data['gt'].float()
     num = (2 * pred * gt).mean()
     den = (gt.mean() + pred.mean() + 1e-10)
-    return num/den
+    return 1 - num/den
+
 
 def self_supervised_image(image, output, *args, **kwargs):
     """
