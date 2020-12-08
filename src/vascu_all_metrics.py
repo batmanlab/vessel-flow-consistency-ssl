@@ -8,20 +8,26 @@ from tqdm import tqdm
 import os
 import sys
 from data_loader.datasets import VascuDataset
-from skimage.filters import frangi
+from skimage.filters import frangi, sato
 from sklearn import metrics
 from matplotlib import pyplot as plt
 import argparse
 import cv2
+import nibabel as nib
+import SimpleITK as sitk
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--method', type=str, default='frangi')
-parser.add_argument('--dir', type=str, default='.')
+parser.add_argument('--dir', type=str, default='/pghbio/dbmi/batmanlab/rohit33/vascutest')
 parser.add_argument('--sigma', type=float, default=0)
 parser.add_argument('--threshold', type=float, default=None)
 
 def frangi_vesselness(img, i):
     ves = frangi(img, np.linspace(1, 12, 12), black_ridges=False).astype(np.float32)
+    return ves
+
+def sato_vesselness(img, i):
+    ves = sato(img, np.linspace(1, 12, 12), black_ridges=False).astype(np.float32)
     return ves
 
 
@@ -72,13 +78,17 @@ def compute_threshold(ds, args):
     '''
     if args.method == 'frangi':
         vfunc = frangi_vesselness
+    elif args.method == 'sato':
+        vfunc = sato_vesselness
     else:
         vfunc = vesselness_file(os.path.join(args.dir, 'train_vesselness_3d.pkl'))
 
     Thres = []
-    for i in tqdm(range(len(ds))):
+    for i in tqdm(range(len(ds)//8)):
         img = ds[i]['image'][0].data.cpu().numpy()
         lab = (ds[i]['gt'][0].data.cpu().numpy() >= 0.5).astype(int)
+        if lab.max() <= 0:
+            continue
 
         ves = vfunc(img, i)
         fpr, tpr, thres = metrics.roc_curve(lab.reshape(-1), ves.reshape(-1), pos_label=1)
@@ -105,6 +115,8 @@ def print_all_test_metrics(ds, args, threshold):
     # Print things like accuracy, AUC, etc
     if args.method == 'frangi':
         vfunc = frangi_vesselness
+    elif args.method == 'sato':
+        vfunc = sato_vesselness
     else:
         vfunc = vesselness_file(os.path.join(args.dir, 'test_vesselness_3d.pkl'))
 
@@ -126,6 +138,28 @@ def print_all_test_metrics(ds, args, threshold):
         dice.append(dice_score(vthres, lab))
         spec.append(specificity(vthres, lab))
         sens.append(sensitivity(vthres, lab))
+        # Save results
+        '''
+        filename = ds.files[i]
+        filename = filename.split("/")[-3:-1]
+        filename = "vascutest/" + '-'.join(filename)
+        inpname = filename + "-inp.nii"
+        gtname = filename + "-gt.nii"
+        vname = filename + "-{}.nii".format(args.method)
+        # Save input, output, ground truth
+        inpimg = nib.Nifti1Image(img, affine=np.eye(4))
+        gtimg  = nib.Nifti1Image(lab, affine=np.eye(4))
+        vimg   = nib.Nifti1Image(vthres, affine=np.eye(4))
+        # Save them
+        if not os.path.exists(inpname):
+            nib.save(inpimg, inpname)
+        if not os.path.exists(gtname):
+            nib.save(gtimg, gtname)
+        if not os.path.exists(vname):
+            nib.save(vimg, vname)
+
+        '''
+
 
     print("Method: {}".format(args.method))
     print("AUC: {:.5f} , Acc: {:.5f} , Dice: {:.5f} , Sensitivity: {:.5f} , Specificity: {:.5f}".format(

@@ -15,23 +15,31 @@ def load_image(imgfile):
     img = sitk.GetArrayFromImage(img)
     return img
 
-PATCHSIZE=64
+PATCHSIZE = 64
 GAP = 48
 
 class COPDDataset(Dataset):
 
     def __init__(self, data_dir, train=True, patientIDs=None, minibatch=4, augment=False, minval=-250, maxval=250):
-        self.data_dir = data_dir
         self.train = train
         self.minibatch = minibatch
+        if self.train:
+            data_dir = osp.join(data_dir, 'train/croppedCT')
+        else:
+            data_dir = osp.join(data_dir, 'test/croppedCT')
+        self.data_dir = data_dir
         if not train:
             augment = False
+
         self.augment = augment
         self.minval = minval*1.0
         self.maxval = maxval*1.0
 
-        for r, dirs, files in os.walk(data_dir):
+        self.files = []
+        for r, dirs, files in os.walk(self.data_dir):
             self.files = list(map(lambda x: os.path.join(r, x), files))
+            if patientIDs is not None:
+                self.files = list(filter(lambda x: any([pid in x for pid in patientIDs]), self.files))
 
         print(len(self.files))
         print(self.files)
@@ -50,6 +58,7 @@ class COPDDataset(Dataset):
             self.cumulative_patches.append(self.cumulative_patches[-1] + patches)
 
         self.cumulative_patches = self.cumulative_patches[1:]
+        self.buf = dict()
 
     def __len__(self,):
         return self.cumulative_patches[-1]
@@ -84,7 +93,13 @@ class COPDDataset(Dataset):
         # Load image
         imgpatches = []
         identifiers = []
-        img = load_image(self.files[imgidx])
+        if self.buf.get(imgidx) is None:
+            img = load_image(self.files[imgidx])
+            self.buf = dict()
+            self.buf[imgidx] = img + 0
+        else:
+            img = self.buf[imgidx]
+
         img = self.normalize(img)
         #print(img.min(), img.max())
 
@@ -99,6 +114,8 @@ class COPDDataset(Dataset):
             identifiers.append((imgidx, n1, n2, n3))
 
         imgpatches = torch.FloatTensor(imgpatches)[:, None]   # [B, 1, H, W, D]
+        if imgpatches.shape[0] == 1:
+            imgpatches = imgpatches.squeeze(0)
         return {
             'image': imgpatches,
             'identifiers': torch.LongTensor(identifiers),
@@ -107,7 +124,7 @@ class COPDDataset(Dataset):
 
 
 if __name__ == '__main__':
-    ds = COPDDataset('/pghbio/dbmi/batmanlab/rohit33/COPD/train/croppedCT/')
+    ds = COPDDataset('/pghbio/dbmi/batmanlab/rohit33/COPD/', train=False)
     print(len(ds))
     print(ds[0]['image'].shape)
     print(ds[0]['image'].mean())

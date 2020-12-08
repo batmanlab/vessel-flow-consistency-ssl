@@ -530,6 +530,23 @@ class UNet3D(Abstract3DUNet):
                                      conv_padding=conv_padding, **kwargs)
 
 
+class UNet3Dsmall(Abstract3DUNet):
+    """
+    3DUnet model from
+    `"3D U-Net: Learning Dense Volumetric Segmentation from Sparse Annotation"
+        <https://arxiv.org/pdf/1606.06650.pdf>`.
+
+    Uses `DoubleConv` as a basic_module and nearest neighbor upsampling in the decoder
+    """
+
+    def __init__(self, in_channels, out_channels, min_scale, vessel_scale_factor, final_sigmoid=True, f_maps=16, layer_order='gcr',
+                 num_groups=1, num_levels=2, is_segmentation=False, conv_padding=1, **kwargs):
+        super(UNet3Dsmall, self).__init__(in_channels=in_channels, out_channels=out_channels, min_scale=min_scale, vessel_scale_factor=vessel_scale_factor, final_sigmoid=final_sigmoid,
+                                     basic_module=DoubleConv, f_maps=f_maps, layer_order=layer_order,
+                                     num_groups=num_groups, num_levels=num_levels, is_segmentation=is_segmentation,
+                                     conv_padding=conv_padding, **kwargs)
+
+
 class ResidualUNet3D(Abstract3DUNet):
     """
     Residual 3DUnet model implementation based on https://arxiv.org/pdf/1706.00120.pdf.

@@ -60,6 +60,9 @@ lab = sitk.GetArrayFromImage(lab)[:, ::-1] > 0   # Make binary label
 lab = binary_erosion(lab, np.ones((3,3,3)))
 assert img.shape == lab.shape
 
+## Original image, save a copy
+origimg = img + 0
+
 # Threshold appropriately
 img[img < args.minval] = args.minval
 img[img > args.maxval] = args.maxval
@@ -82,6 +85,11 @@ H, W, D = cropimg.shape
 Ho = H + (48 - (H-64)%48)%48
 Wo = W + (48 - (W-64)%48)%48
 Do = D + (48 - (D-64)%48)%48
+# Save one output for visualization
+croppedOrigImg = origimg[xmin:xmax, ymin:ymax, zmin:zmax]
+outvizimg = np.zeros((Ho, Wo, Do)) + croppedOrigImg.min()
+outvizimg[:H, :W, :D] = croppedOrigImg + 0
+# Save output
 outimg = np.zeros((Ho, Wo, Do)) + args.minval
 outimg[:H, :W, :D] = cropimg
 print(img.shape, cropimg.shape, outimg.shape)
@@ -91,3 +99,7 @@ trainstr = 'train' if args.train else 'test'
 outfilepath = "/pghbio/dbmi/batmanlab/rohit33/COPD/{}/croppedCT/{}.nii.gz".format(trainstr, patientID)
 sitk.WriteImage(sitk.GetImageFromArray(outimg), outfilepath)
 
+# Save cropped image
+trainstr = 'train' if args.train else 'test'
+outfilepath = "/pghbio/dbmi/batmanlab/rohit33/COPD/{}/croppedCT/{}_orig.nii.gz".format(trainstr, patientID)
+sitk.WriteImage(sitk.GetImageFromArray(outvizimg), outfilepath)

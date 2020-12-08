@@ -1,49 +1,54 @@
 {
-    "name": "copdsq4",
+    "name": "stare_supervised_v2",
     "n_gpu": 2,
     "arch": {
-        "type": "UNet3D",
+        "type": "UNet",
         "args": {
-            "in_channels": 1,
-            "out_channels": 3,
+            "inp_channels": 1,
+            "out_channels": 4,
             "min_scale": 0.5,
-            "vessel_scale_factor": 11.5
+            "vessel_scale_factor": 4.5
         }
     },
     "log_dir": "/pghbio/dbmi/batmanlab/rohit33/saved_models",
     "data_loader": {
-        "type": "COPDDataLoader",
+        "type": "STARESupDataLoader",
         "args": {
-            "data_dir": "/pghbio/dbmi/batmanlab/rohit33/COPD/",
-            "batch_size": 2,
+            "data_dir": "/pghbio/dbmi/batmanlab/rohit33/STARE/",
+            "batch_size": 4,
             "shuffle": true,
-            "validation_split": 0,
-            "num_workers": 4
+            "validation_split": 0.8,
+            "num_workers": 4,
+            "toy": false
         }
     },
-    "vessel_type": "light",
+    "vessel_type": "dark",
     "optimizer": {
         "type": "Adam",
         "args":{
             "lr": 0.001,
-            "weight_decay": 1e-5,
+            "weight_decay": 0,
             "amsgrad": true
         }
     },
-    "loss": "vessel_loss_3d",
+    "loss": "dice_loss",
     "loss_args": {
+        "num_directions": 2,
+        "eps": 1e-1,
+        "uncertainty": false,
         "loss_intensity": "L2",
         "lambda_template": 1,
         "lambda_intensity": 1,
         "lambda_cosine": 1,
         "lambda_consistency": 0,
-        "lambda_decoder": 1,
-        "parallel_scale": 2,
+        "lambda_decoder": 0,
         "is_crosscorr": true,
+        "use_mask": true,
         "detach": true,
         "num_samples_template": 12
     },
     "metrics": [
+        "recon_error_l2"
     ],
     "lr_scheduler": {
         "type": "StepLR",
@@ -53,9 +58,9 @@
         }
     },
     "trainer": {
-        "epochs": 500,
+        "epochs": 50,
         "save_dir": "/pghbio/dbmi/batmanlab/rohit33/saved_models",
-        "save_period": 1,
+        "save_period": 2,
         "verbosity": 2,
         "monitor": "min val_loss",
         "early_stop": 1000,

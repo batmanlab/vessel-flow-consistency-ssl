@@ -4,26 +4,51 @@ Use this script to generate threshold from the training set, and then use the te
 import torch
 import pickle as pkl
 import numpy as np
+from itertools import product
 from tqdm import tqdm
 import os
 import sys
 import xml.etree.ElementTree as ET
-from PIL import Image
 from data_loader.datasets import DriveDataset, StareDataset
-from skimage.filters import frangi, sato, meijering, hessian
-from scipy.ndimage.morphology import binary_dilation
+from skimage.filters import frangi
 from sklearn import metrics
 from matplotlib import pyplot as plt
 import argparse
 import cv2
 
+from skimage import data
+from skimage.util import img_as_float
+from skimage.filters import gabor_kernel
+from scipy import ndimage as ndi
+
+
 parser = argparse.ArgumentParser()
-parser.add_argument('--method', type=str, default='frangi')
 parser.add_argument('--dir', type=str, default='.')
 parser.add_argument('--dataset', type=str, default='drive')
 parser.add_argument('--threshold', type=float, default=None)
 parser.add_argument('--mode', type=str, default='test')
 parser.add_argument('--fold', type=int, default=-1)
+
+# Get Gabor filters ready
+# tau = [1,2,4,6,7,8,9,10,12,16]
+# tau = [0, 1, 2, 3]
+tau = [0, 3]
+lengths = [1, 2, 3, 4]
+sigmas = list(range(12))
+Theta = np.arange(0, np.pi, np.pi/180*15)
+
+# Get all kernels
+kernels = []
+for theta in Theta:
+    for t, l, s in product(tau, lengths, sigmas):
+        kernel = np.real(gabor_kernel(t, theta=theta, sigma_x = s, sigma_y = l*s))
+        H, W = kernel.shape
+        mx, Mx = max(0, H//2 - 7), min(H, H//2 + 8)
+        my, My = max(0, W//2 - 7), min(W, W//2 + 8)
+        kernel = kernel[mx:Mx, my:My]
+        kernels.append(kernel)
+print("Computed {} kernels".format(len(kernels)))
+
 
 def get_bbox_anno(filename):
     tree = ET.parse(filename)
@@ -45,28 +70,21 @@ def get_bbox_anno(filename):
 
 
 def frangi_vesselness(img, i):
-    ves = frangi(img, sigmas=np.linspace(1, 5, 5), black_ridges=True).astype(np.float32)
+    ves = frangi(img, np.linspace(1, 5, 5), black_ridges=True).astype(np.float32)
     return ves
 
-def meijering_vesselness(img, i):
-    im  = img
-    # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-    # im = clahe.apply((img*255).astype(np.uint8))/255.0
-    ves = meijering(im, sigmas=np.linspace(1, 5, 5), black_ridges=True).astype(np.float32)
-    return ves
 
-def sato_vesselness(img, i):
-    ves = sato(img, sigmas=np.linspace(1, 5, 5), black_ridges=True).astype(np.float32)
-    return ves
-
-def hessian_vesselness(img, i):
-    ves = hessian(img, sigmas=np.linspace(1, 5, 5), black_ridges=True).astype(np.float32)
+def gabor_vesselness(img, i):
+    ves = np.zeros([len(kernels), ] + list(img.shape))
+    for k, kernel in enumerate(kernels):
+        filt = ndi.convolve(-img, kernel, mode='wrap')
+        ves[k] = filt
+    ves = ves.max(0)
     return ves
 
 def vesselness_file(filename):
     with open(filename, 'rb') as fi:
         data = pkl.load(fi)
-    print("Using output from {}".format(filename))
     def v(img, i):
         V = data[i, 0]
         return V
@@ -80,11 +98,8 @@ def AUC(ves, G, num=1000):
     return metrics.auc(fpr, tpr)
 
 
-def multiply_mask(ves, mask, takemin=True):
-    if takemin:
-        m = ves.min()
-    else:
-        m = 0
+def multiply_mask(ves, mask):
+    m = 0
     y, x = np.where(mask < 0.5)
     ves[y, x] = m
     return ves - m
@@ -114,23 +129,15 @@ def compute_threshold(ds, gt, args):
     '''
     From the dataset, determine threshold to maximize Dice
     '''
-    if args.method == 'frangi':
-        vfunc = frangi_vesselness
-    elif args.method == 'sato':
-        vfunc = sato_vesselness
-    elif args.method == 'hessian':
-        vfunc = hessian_vesselness
-    elif args.method == 'meijering':
-        vfunc = meijering_vesselness
-    elif args.method == 'ours':
-        vfunc = vesselness_file(os.path.join(args.dir, 'train_vesselness.pkl'))
-    else:
-        raise NotImplementedError
+    #if args.method == 'frangi':
+        #vfunc = frangi_vesselness
+    #else:
+        #vfunc = vesselness_file(os.path.join(args.dir, 'train_vesselness.pkl'))
+    vfunc = gabor_vesselness
 
     Thres = []
     fold = args.fold
     for i in tqdm(range(len(ds))):
-        # Check fold
         if args.fold != -1:
             if i >= 4*fold and i - 4*fold < 4:
                 pass
@@ -140,9 +147,8 @@ def compute_threshold(ds, gt, args):
             # break
         #if i%5 == 0:
             #print("Index {}".format(i))
-        # print(i)
         img = ds[i]['image'][0].data.cpu().numpy()
-        lab = (gt[i]['image'][0].data.cpu().numpy() >= 0.5).astype(float)
+        lab = (gt[i]['image'][0].data.cpu().numpy() >= 0.5).astype(int)
         mask = ds[i]['mask'][0].data.cpu().numpy()
 
         ves = vfunc(img, i)
@@ -154,12 +160,6 @@ def compute_threshold(ds, gt, args):
 
 def accuracy(v, gt):
     return (v == gt).astype(float).mean()
-
-def localaccuracy(v, gt):
-    gtdilate = binary_dilation(gt, np.ones((3, 3)))
-    y, x = np.where(gtdilate > 0)
-    acc = accuracy(v[y, x], gt[y, x])
-    return acc
 
 def specificity(v, gt):
     tn = ((v == 0)&(gt == 0)).mean()
@@ -174,16 +174,11 @@ def sensitivity(v, gt):
 
 def get_anno_metrics(ds, gt, args, threshold):
     # Print dice for annotations
-    if args.method == 'frangi':
-        vfunc = frangi_vesselness
-    elif args.method == 'sato':
-        vfunc = sato_vesselness
-    elif args.method == 'hessian':
-        vfunc = hessian_vesselness
-    elif args.method == 'meijering':
-        vfunc = meijering_vesselness
-    elif args.method == 'ours':
-        vfunc = vesselness_file(os.path.join(args.dir, 'test_vesselness.pkl'))
+    #if args.method == 'frangi':
+        #vfunc = frangi_vesselness
+    #else:
+        #vfunc = vesselness_file(os.path.join(args.dir, 'test_vesselness.pkl'))
+    vfunc = gabor_vesselness
 
     dice = []
     for i in range(10):
@@ -192,11 +187,11 @@ def get_anno_metrics(ds, gt, args, threshold):
         bboxes = get_bbox_anno(annoname)
         ## Get dataloader
         img = ds[i]['image'][0].data.cpu().numpy()
-        lab = (gt[i]['image'][0].data.cpu().numpy() >= 0.5).astype(float)
+        lab = (gt[i]['image'][0].data.cpu().numpy() > 0.5).astype(float)
         mask = ds[i]['mask'][0].data.cpu().numpy()
         # Get vesselness
         ves = vfunc(img, i)
-        ves = multiply_mask(ves, mask, takemin=args.method != 'ours')
+        ves = multiply_mask(ves, mask)
         vthres = (ves >= threshold).astype(float)
         # Take bounding boxes
         for xmin, xmax, ymin, ymax in bboxes:
@@ -208,83 +203,35 @@ def get_anno_metrics(ds, gt, args, threshold):
     print("Mean: {:.5f}, Std: {:.5f}".format(np.mean(dice), np.std(dice)))
 
 
-def get_image_difference(vthres, lab):
-    # Get difference
-    H, W = vthres.shape
-    diff = np.zeros((H, W, 3))
-    # Color tp pixels white
-    tp = (vthres == 1)&(lab == 1)
-    y, x = np.where(tp)
-    diff[y, x, :] = 1.0
-    # Color fp pixels red
-    fp = (vthres == 1)&(lab == 0)
-    y, x = np.where(fp)
-    diff[y, x, 0] = 1.0
-    # Color fn pixels green
-    fn = (vthres == 0)&(lab == 1)
-    y, x = np.where(fn)
-    diff[y, x, 1] = 1.0
-    diff = (diff * 255).astype(np.uint8)
-    # Get image
-    im = Image.fromarray(diff)
-    return im
-
-
 
 def print_all_test_metrics(ds, gt, args, threshold):
     # Print things like accuracy, AUC, etc
-    if args.method == 'frangi':
-        vfunc = frangi_vesselness
-    elif args.method == 'sato':
-        vfunc = sato_vesselness
-    elif args.method == 'hessian':
-        vfunc = hessian_vesselness
-    elif args.method == 'meijering':
-        vfunc = meijering_vesselness
-    elif args.method == 'ours':
-        vfunc = vesselness_file(os.path.join(args.dir, 'test_vesselness.pkl'))
-    else:
-        raise NotImplementedError
+    vfunc = gabor_vesselness
 
     auc = []
     dice = []
     acc = []
     spec = []
     sens = []
-    localacc = []
 
-    os.makedirs("drive{}test".format(args.method), exist_ok=True)
-    for i in range(len(ds)):
+    for i in tqdm(range(len(ds))):
         img = ds[i]['image'][0].data.cpu().numpy()
-        lab = (gt[i]['image'][0].data.cpu().numpy() >= 0.5).astype(float)
+        lab = (gt[i]['image'][0].data.cpu().numpy() > 0.5).astype(float)
         mask = ds[i]['mask'][0].data.cpu().numpy()
         # Get vesselness
         ves = vfunc(img, i)
-        ves = multiply_mask(ves, mask, takemin=args.method != 'ours')
+        ves = multiply_mask(ves, mask)
         vthres = (ves >= threshold).astype(float)
-
-        # Difference image
-        diffim = get_image_difference(vthres, lab)
-        diffim.save("drive{}test/diff_{}.png".format(args.method, ds.images[i].split('/')[-1]))
-        # save it
-        saveim = Image.fromarray((np.tile(255*vthres[:, :, None], (1, 1, 3))).astype(np.uint8))
-        saveim.save("drive{}test/{}.png".format(args.method, ds.images[i].split('/')[-1]))
-
         # Get metrics
         auc.append(AUC(ves, lab))
         acc.append(accuracy(vthres, lab))
         dice.append(dice_score(vthres, lab))
         spec.append(specificity(vthres, lab))
         sens.append(sensitivity(vthres, lab))
-        localacc.append(localaccuracy(vthres, lab))
 
-    print("Method: {}".format(args.method))
-    print("AUC: {:.5f} , Acc: {:.5f} , Dice: {:.5f} , Sensitivity: {:.5f} , Specificity: {:.5f}, Local accuracy: {:.5f}".format(
-              np.mean(auc), 100*np.mean(acc), np.mean(dice), np.mean(sens), np.mean(spec), 100*np.mean(localacc)
-        ))
-    print("Stddeviation:")
-    print("AUC: {:.5f} , Acc: {:.5f} , Dice: {:.5f} , Sensitivity: {:.5f} , Specificity: {:.5f}, Local accuracy: {:.5f}".format(
-              np.std(auc), 100*np.std(acc), np.std(dice), np.std(sens), np.std(spec), 100*np.std(localacc)
+    print("Method: {}".format("Gabor"))
+    print("AUC: {:.5f} , Acc: {:.5f} , Dice: {:.5f} , Sensitivity: {:.5f} , Specificity: {:.5f}".format(
+              np.mean(auc), np.mean(acc), np.mean(dice), np.mean(sens), np.mean(spec)
         ))
 
 

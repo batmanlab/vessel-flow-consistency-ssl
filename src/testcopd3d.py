@@ -128,7 +128,7 @@ def main(config, args):
             ## Change this for different vesselness modes
             ves = vesselfunc(data['image'], output, nsample=nsample, vtype=vessel_type, mask=mask, is_crosscorr=args.crosscorr, parallel_scale=parallel_scale, sv_range=sv_range)
             ves = ves.data.cpu().numpy()
-            ves = smooth(ves, s)
+            # ves = smooth(ves, s)
 
             ## Put all outputs to cpu
             for k, v in output.items():
@@ -142,11 +142,11 @@ def main(config, args):
 
 
         # computing loss, metrics on test set
-        with open('/pghbio/dbmi/batmanlab/rohit33/vascutest/{}_vesselness_3d.pkl'.format(trainstr), 'wb') as fi:
+        with open('/pghbio/dbmi/batmanlab/rohit33/copd_{}_vesselness_3d.pkl'.format(args.patientIDs[0]), 'wb') as fi:
             pkl.dump(vesselness, fi)
 
         # store everything in another pickle file
-        with open('/pghbio/dbmi/batmanlab/rohit33/vascutest/{}_analysis_3d.pkl'.format(trainstr), 'wb') as fi:
+        with open('/pghbio/dbmi/batmanlab/rohit33/copd_{}_analysis_3d.pkl'.format(args.patientIDs[0]), 'wb') as fi:
             torch.save(alloutputs, fi)
 
 
@@ -167,4 +167,6 @@ if __name__ == '__main__':
 
     config = ConfigParser.from_args(args)
     args = args.parse_args()
+    print(args.patientIDs)
+    print()
     main(config, args)
