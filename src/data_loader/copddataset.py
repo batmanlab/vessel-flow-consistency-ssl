@@ -20,7 +20,7 @@ GAP = 48
 
 class COPDDataset(Dataset):
 
-    def __init__(self, data_dir, train=True, patientIDs=None, minibatch=4, augment=False, minval=-250, maxval=250):
+    def __init__(self, data_dir, train=True, patientIDs=None, minibatch=4, augment=False, minval=-900, maxval=250):
         self.train = train
         self.minibatch = minibatch
         if self.train:
@@ -66,6 +66,8 @@ class COPDDataset(Dataset):
     def normalize(self, img):
         M = self.maxval
         m = self.minval
+        img[img < m] = m
+        img[img > M] = M
         return (img - m)/(M-m)
 
     def get_patch(self, img, n1, n2, n3):

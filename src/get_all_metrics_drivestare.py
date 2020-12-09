@@ -205,7 +205,7 @@ def get_anno_metrics(ds, gt, args, threshold):
             _dice = dice_score(vpred, vgt)
             if not np.isnan(_dice):
                 dice.append(_dice)
-    print("Mean: {:.5f}, Std: {:.5f}".format(np.mean(dice), np.std(dice)))
+    print("Mean: {:.2f}, Std: {:.2f}".format(np.mean(dice), np.std(dice)))
 
 
 def get_image_difference(vthres, lab):

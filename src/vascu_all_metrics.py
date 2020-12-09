@@ -18,7 +18,8 @@ import SimpleITK as sitk
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--method', type=str, default='frangi')
-parser.add_argument('--dir', type=str, default='/pghbio/dbmi/batmanlab/rohit33/vascutest')
+#parser.add_argument('--dir', type=str, default='/pghbio/dbmi/batmanlab/rohit33/vascutest')
+parser.add_argument('--dir', type=str, default='.')
 parser.add_argument('--sigma', type=float, default=0)
 parser.add_argument('--threshold', type=float, default=None)
 
@@ -32,6 +33,7 @@ def sato_vesselness(img, i):
 
 
 def vesselness_file(filename):
+    print("Loading from {}".format(filename))
     with open(filename, 'rb') as fi:
         data = pkl.load(fi)
 
@@ -84,7 +86,7 @@ def compute_threshold(ds, args):
         vfunc = vesselness_file(os.path.join(args.dir, 'train_vesselness_3d.pkl'))
 
     Thres = []
-    for i in tqdm(range(len(ds)//8)):
+    for i in tqdm(range(len(ds))):
         img = ds[i]['image'][0].data.cpu().numpy()
         lab = (ds[i]['gt'][0].data.cpu().numpy() >= 0.5).astype(int)
         if lab.max() <= 0:
@@ -164,6 +166,9 @@ def print_all_test_metrics(ds, args, threshold):
     print("Method: {}".format(args.method))
     print("AUC: {:.5f} , Acc: {:.5f} , Dice: {:.5f} , Sensitivity: {:.5f} , Specificity: {:.5f}".format(
               np.mean(auc), np.mean(acc), np.mean(dice), np.mean(sens), np.mean(spec)
+        ))
+    print("AUC: {:.5f} , Acc: {:.5f} , Dice: {:.5f} , Sensitivity: {:.5f} , Specificity: {:.5f}".format(
+              np.std(auc), np.std(acc), np.std(dice), np.std(sens), np.std(spec)
         ))
 
 

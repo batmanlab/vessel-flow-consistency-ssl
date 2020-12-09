@@ -35,21 +35,20 @@ class VascuDataset(Dataset):
         self.sigma = sigma
 
     def __len__(self,):
-        return len(self.files)*8
+        return len(self.files)
 
     def normalize(self, img):
-        M = 255
-        m = 0
+        M = 255.0
+        m = 0.0
         return (img - m)/(M - m)
 
-    def crop(self, img, n=0):
+    def crop(self, img, P=64):
         H, W, D = img.shape
-        nimg = np.zeros((128, 128, 128))
-        nimg[:H, :W, :D] = img + 0
-        h = n%2
-        w = (n//2)%2
-        d = (n//2)//2
-        return nimg[64*h: 64*(h+1), 64*w:64*(w+1), 64*d:64*(d+1)]
+        H = H//2
+        W = W//2
+        D = D//2
+        img = img[H-P//2:H-P//2 + P, W-P//2:W-P//2+P, D-P//2:D-P//2+P]
+        return img
 
     def get_noise(self, idx, shape,):
         thres = 0 if self.train else 1000
@@ -58,10 +57,9 @@ class VascuDataset(Dataset):
         return noise
 
     def __getitem__(self, idx):
-        # print(idx//8, idx%8)
-        img = load_image(self.files[idx//8])
+        img = load_image(self.files[idx])
         img = self.normalize(img)
-        img = self.crop(img, idx%8)
+        img = self.crop(img)
         gt = (img > 0.1).astype(int)
         # Add noise to image
         img = img + self.get_noise(idx, img.shape)
@@ -73,7 +71,6 @@ class VascuDataset(Dataset):
 
 if __name__ == '__main__':
     ds = VascuDataset('/pghbio/dbmi/batmanlab/rohit33/VascuSynth')
-    for i in range(10):
-        print(len(ds))
-        print(ds[i]['image'].shape)
-        #print(ds[i]['image'].mean())
+    print(len(ds))
+    print(ds[0]['image'].shape)
+    print(ds[0]['image'].mean())

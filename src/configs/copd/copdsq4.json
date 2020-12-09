@@ -6,8 +6,8 @@
         "args": {
             "in_channels": 1,
             "out_channels": 3,
-            "min_scale": 0.5,
-            "vessel_scale_factor": 11.5
+            "min_scale": 0.25,
+            "vessel_scale_factor": 4.5
         }
     },
     "log_dir": "/pghbio/dbmi/batmanlab/rohit33/saved_models",

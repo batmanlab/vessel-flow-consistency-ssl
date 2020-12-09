@@ -56,8 +56,8 @@ def main(config, args):
     if config.config['loss'] == 'vessel_loss_2d_sq':
         vesselfunc = v2_sq_vesselness
     elif config.config['loss'] == 'vessel_loss_3d':
-        #vesselfunc = v13d_sq_vesselness_test
-        vesselfunc = v13d_sq_vesselness
+        vesselfunc = v13d_sq_vesselness_test
+        #vesselfunc = v13d_sq_vesselness
     elif config.config['loss'] == 'vessel_loss_3d_bifurc':
         vesselfunc = v13d_sq_jointvesselness
     elif config.config['loss'] == 'vessel_loss_3dmax':
@@ -65,6 +65,7 @@ def main(config, args):
     else:
         assert False, 'Unknown loss function {}'.format(config['loss'])
     print(vesselfunc)
+    input("Press to continue")
 
     if 'max' in config['loss']:
         s = 1
@@ -142,11 +143,13 @@ def main(config, args):
 
 
         # computing loss, metrics on test set
-        with open('/pghbio/dbmi/batmanlab/rohit33/vascutest/{}_vesselness_3d.pkl'.format(trainstr), 'wb') as fi:
+        #with open('/pghbio/dbmi/batmanlab/rohit33/vascutest/{}_vesselness_3d.pkl'.format(trainstr), 'wb') as fi:
+        with open('{}_vesselness_3d.pkl'.format(trainstr), 'wb') as fi:
             pkl.dump(vesselness, fi)
 
         # store everything in another pickle file
-        with open('/pghbio/dbmi/batmanlab/rohit33/vascutest/{}_analysis_3d.pkl'.format(trainstr), 'wb') as fi:
+        #with open('/pghbio/dbmi/batmanlab/rohit33/vascutest/{}_analysis_3d.pkl'.format(trainstr), 'wb') as fi:
+        with open('{}_analysis_3d.pkl'.format(trainstr), 'wb') as fi:
             torch.save(alloutputs, fi)
 
 
