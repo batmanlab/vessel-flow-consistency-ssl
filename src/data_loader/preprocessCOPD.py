@@ -57,8 +57,8 @@ for patientID in patients:
     img = sitk.ReadImage(ctscanfile)
     img = sitk.GetArrayFromImage(img)
 
-    lab = sitk.ReadImage(lobefile)
-    lab = sitk.GetArrayFromImage(lab)[:, ::-1] > 0   # Make binary label
+    Lab = sitk.ReadImage(lobefile)
+    lab = sitk.GetArrayFromImage(Lab)[:, ::-1] > 0   # Make binary label
     lab = binary_erosion(lab, np.ones((3,3,3)))
     assert img.shape == lab.shape
 
@@ -79,6 +79,10 @@ for patientID in patients:
     ymin, ymax = getminmax(y, W)
     zmin, zmax = getminmax(z, D)
 
+    # Crop lab image too
+    croplab = sitk.GetArrayFromImage(Lab)[:, ::-1]
+    croplab = croplab[xmin:xmax, ymin:ymax, zmin:zmax] + 0
+
     # Crop image
     cropimg = img[xmin:xmax, ymin:ymax, zmin:zmax]
     # Pad the image to multiple such that dim = 48n + 64
@@ -91,6 +95,10 @@ for patientID in patients:
     croppedOrigImg = origimg[xmin:xmax, ymin:ymax, zmin:zmax]
     outvizimg = np.zeros((Ho, Wo, Do)) + croppedOrigImg.min()
     outvizimg[:H, :W, :D] = croppedOrigImg + 0
+    # Save output for label also
+    outlab = np.zeros((Ho, Wo, Do))
+    outlab[:H, :W, :D] = croplab + 0
+
     # Save output
     outimg = np.zeros((Ho, Wo, Do)) + args.minval
     outimg[:H, :W, :D] = cropimg
@@ -98,10 +106,14 @@ for patientID in patients:
 
     # Save it
     trainstr = 'train' if args.train else 'test'
+
     outfilepath = "/pghbio/dbmi/batmanlab/rohit33/COPD/{}/croppedCT/{}.nii.gz".format(trainstr, patientID)
     sitk.WriteImage(sitk.GetImageFromArray(outimg), outfilepath)
 
+    # Save label image
+    outfilepath = "/pghbio/dbmi/batmanlab/rohit33/COPD/{}/lobes/lung_{}.nii.gz".format(trainstr, patientID)
+    sitk.WriteImage(sitk.GetImageFromArray(outlab), outfilepath)
+
     # Save cropped image
-    trainstr = 'train' if args.train else 'test'
-    outfilepath = "/pghbio/dbmi/batmanlab/rohit33/COPD/{}/croppedCT/{}_orig.nii.gz".format(trainstr, patientID)
+    outfilepath = "/pghbio/dbmi/batmanlab/rohit33/COPD/{}/origCT/{}_orig.nii.gz".format(trainstr, patientID)
     sitk.WriteImage(sitk.GetImageFromArray(outvizimg), outfilepath)

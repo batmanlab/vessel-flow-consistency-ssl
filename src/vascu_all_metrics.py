@@ -18,13 +18,13 @@ import SimpleITK as sitk
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--method', type=str, default='frangi')
-#parser.add_argument('--dir', type=str, default='/pghbio/dbmi/batmanlab/rohit33/vascutest')
-parser.add_argument('--dir', type=str, default='.')
+parser.add_argument('--dir', type=str, default='/pghbio/dbmi/batmanlab/rohit33/vascutest')
+#parser.add_argument('--dir', type=str, default='.')
 parser.add_argument('--sigma', type=float, default=0)
 parser.add_argument('--threshold', type=float, default=None)
 
 def frangi_vesselness(img, i):
-    ves = frangi(img, np.linspace(1, 12, 12), black_ridges=False).astype(np.float32)
+    ves = frangi(img, np.linspace(1, 12, 5), black_ridges=False).astype(np.float32)
     return ves
 
 def sato_vesselness(img, i):
@@ -63,7 +63,7 @@ def dice_score(a, b):
     return num/den
 
 
-def get_best_dice_threshold(ves, gt, thres, step=10):
+def get_best_dice_threshold(ves, gt, thres, step=30):
     dicevals = []
     # Take dice values
     for t in thres[::step]:
@@ -128,9 +128,11 @@ def print_all_test_metrics(ds, args, threshold):
     spec = []
     sens = []
 
-    for i in tqdm(range(len(ds))):
+    for i in tqdm(range(len(ds)//8)):
         img = ds[i]['image'][0].data.cpu().numpy()
         lab = (ds[i]['gt'][0].data.cpu().numpy() > 0.5).astype(float)
+        if lab.max() <= 0:
+            continue
         # Get vesselness
         ves = vfunc(img, i)
         vthres = (ves >= threshold).astype(float)
@@ -164,11 +166,13 @@ def print_all_test_metrics(ds, args, threshold):
 
 
     print("Method: {}".format(args.method))
-    print("AUC: {:.5f} , Acc: {:.5f} , Dice: {:.5f} , Sensitivity: {:.5f} , Specificity: {:.5f}".format(
-              np.mean(auc), np.mean(acc), np.mean(dice), np.mean(sens), np.mean(spec)
+    #print("AUC: {:.5f} , Acc: {:.5f} , Dice: {:.5f} , Sensitivity: {:.5f} , Specificity: {:.5f}".format(
+    print("{:.2f} {:.2f} {:.2f} {:.2f}".format(
+              np.mean(auc), 100*np.mean(acc), np.mean(dice), np.mean(sens), np.mean(spec)
         ))
-    print("AUC: {:.5f} , Acc: {:.5f} , Dice: {:.5f} , Sensitivity: {:.5f} , Specificity: {:.5f}".format(
-              np.std(auc), np.std(acc), np.std(dice), np.std(sens), np.std(spec)
+    #print("AUC: {:.5f} , Acc: {:.5f} , Dice: {:.5f} , Sensitivity: {:.5f} , Specificity: {:.5f}".format(
+    print("{:.2f} {:.2f} {:.2f} {:.2f}".format(
+              np.std(auc), 100*np.std(acc), np.std(dice), np.std(sens), np.std(spec)
         ))
 
 

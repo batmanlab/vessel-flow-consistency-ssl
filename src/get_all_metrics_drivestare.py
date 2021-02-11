@@ -186,6 +186,8 @@ def get_anno_metrics(ds, gt, args, threshold):
         vfunc = vesselness_file(os.path.join(args.dir, 'test_vesselness.pkl'))
 
     dice = []
+    auc = []
+    acc = []
     for i in range(10):
         annoname = "/pghbio/dbmi/batmanlab/rohit33/DRIVE/test/branchannotations/{:02d}_manual1.xml".format(i+1)
         #print(annoname)
@@ -200,12 +202,27 @@ def get_anno_metrics(ds, gt, args, threshold):
         vthres = (ves >= threshold).astype(float)
         # Take bounding boxes
         for xmin, xmax, ymin, ymax in bboxes:
-            vpred = vthres[ymin:ymax+1, xmin:xmax+1]
-            vgt = lab[ymin:ymax+1, xmin:xmax+1]
-            _dice = dice_score(vpred, vgt)
-            if not np.isnan(_dice):
-                dice.append(_dice)
-    print("Mean: {:.2f}, Std: {:.2f}".format(np.mean(dice), np.std(dice)))
+            try:
+                vpred = vthres[ymin:ymax+1, xmin:xmax+1]
+                vgt = lab[ymin:ymax+1, xmin:xmax+1]
+                if vpred.size == 0:
+                    continue
+                if vgt.astype(float).mean() < 0.25:
+                    continue
+                _dice = dice_score(vpred, vgt)
+                _auc = AUC(ves[ymin:ymax+1, xmin:xmax+1], vgt)
+                _acc = (vpred == vgt).astype(float).mean()
+                if not np.isnan(_dice):
+                    dice.append(_dice)
+                if not np.isnan(_auc):
+                    auc.append(_auc)
+                if not np.isnan(_acc):
+                    acc.append(_acc*100)
+            except:
+                pass
+    print("Dice Mean: {:.2f}, Std: {:.2f}".format(np.mean(dice), np.std(dice)))
+    print("AUC Mean: {:.2f}, Std: {:.2f}".format(np.mean(auc), np.std(auc)))
+    print("Acc Mean: {:.2f}, Std: {:.2f}".format(np.mean(acc), np.std(acc)))
 
 
 def get_image_difference(vthres, lab):
