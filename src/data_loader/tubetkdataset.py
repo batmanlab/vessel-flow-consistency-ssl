@@ -11,7 +11,8 @@ from scipy import ndimage as nd
 import nibabel as nib
 import SimpleITK as sitk
 
-
+N = 32
+M = 80
 DIMS = (128, 448, 448)
 
 class TubeTKDataset(Dataset):
@@ -40,6 +41,14 @@ class TubeTKDataset(Dataset):
 
         self.allmra = allmra
         self.alltre = alltre
+
+        # Split according to train or test
+        if train:
+            self.allmra = self.allmra[:N]
+            self.alltre = self.alltre[:N]
+        else:
+            self.allmra = self.allmra[N:]
+            self.alltre = self.alltre[N:]
 
         # Calculate number of patches per dimension
         self.Np = [math.ceil(DIMS[i]/64.) for i in range(3)]
@@ -101,8 +110,91 @@ class TubeTKDataset(Dataset):
 
 
 
+class TubeTKFullDataset(Dataset):
+
+    def __init__(self, data_dir, train=True, offset=0):
+        self.data_dir = data_dir
+        allmra = []
+        for r, dirs, files in os.walk(data_dir):
+            files = map(lambda x: os.path.join(r,x), files)
+            files = filter(lambda x: 'MRA' in x, files)
+            files = filter(lambda x: x.endswith('.mha'), files)
+            allmra.extend(files)
+
+        # Get an offset
+        if offset > 0:
+            allmra = allmra[offset:] + allmra[:offset]
+
+        self.allmra = sorted(allmra)
+
+        # Split according to train or test
+        if train:
+            self.allmra = self.allmra[:M]
+        else:
+            self.allmra = self.allmra[M:]
+        # Calculate number of patches per dimension
+        self.Np = [math.ceil(DIMS[i]/64.) for i in range(3)]
+        self.numPatches = np.prod(np.array(self.Np))
+        print("{} patches per image.".format(self.numPatches))
+        #print(self.allmra)
+        self.buf = dict()
+
+
+    def __len__(self,):
+        return len(self.allmra)*self.numPatches
+
+
+    def crop(self, img, patchid):
+        pids = []
+        # Get patchids
+        pid = patchid
+        for _ in range(3):
+            pids.append(pid%self.Np[_])
+            pid = pid//self.Np[_]
+
+        #print(patchid, pids)
+        pids = [64*_ for _ in pids]
+
+        h, w, d = pids
+        return img[h:h+64, w:w+64, d:d+64]
+
+
+    def load_image(self, imgfile):
+        if self.buf.get(imgfile) is None:
+            self.buf = dict()
+            img = sitk.ReadImage(imgfile)
+            img = sitk.GetArrayFromImage(img)*1.0
+            self.buf[imgfile] = img + 0
+        else:
+            img = self.buf[imgfile] + 0
+        return img
+
+
+    def normalize(self, img):
+        M = img.max()
+        m = img.min()
+        return 2*(img - m)/(M - m) - 1
+
+    def __getitem__(self, idx):
+        patchid = idx%self.numPatches
+        imgid = idx//self.numPatches
+
+        # Load image
+        img = self.load_image(self.allmra[imgid]) + 0
+        img = self.normalize(img + 0)
+        #print(img.min(), img.max(), img.dtype)
+        #print(img.min(), img.max())
+        img = self.crop(img, patchid)
+        return {
+                'image': torch.FloatTensor(img)[None],
+                'gt': 0,
+        }
+
+
+
 if __name__ == '__main__':
-    ds = TubeTKDataset('/ocean/projects/asc170022p/rohit33/TubeTK')
+    #ds = TubeTKDataset('/ocean/projects/asc170022p/rohit33/TubeTK')
+    ds = TubeTKFullDataset('/ocean/projects/asc170022p/rohit33/TubeTK')
     print(len(ds))
     for _ in range(60):
         d  = ds[_]['image']

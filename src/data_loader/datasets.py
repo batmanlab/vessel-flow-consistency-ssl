@@ -9,4 +9,6 @@ from data_loader.staresupdataset import StareSupDataset
 from data_loader.copddataset import COPDDataset
 from data_loader.toydataset import *
 from data_loader.vascu import *
+from data_loader.tubetkdataset import TubeTKDataset, TubeTKFullDataset
+from data_loader.vessel12dataset import Vessel12Dataset
 

@@ -163,3 +163,27 @@ class ToyCurvedLineLoader(BaseDataLoader):
         self.img_size = img_size
         self.dataset = ToyCurvedLines(self.img_size, train=training)
         super().__init__(self.dataset, batch_size, shuffle, validation_split, num_workers)
+
+
+class TubeTKMRADataLoader(BaseDataLoader):
+    '''
+    Data loader for VascuSynth dataset
+    '''
+    def __init__(self, data_dir, batch_size, shuffle=True, validation_split=0.0, num_workers=1, training=True, full_data=True):
+        self.data_dir = data_dir
+        if full_data:
+            self.dataset = TubeTKFullDataset(data_dir, train=training)
+        else:
+            self.dataset = TubeTKDataset(data_dir, train=training)
+        super().__init__(self.dataset, batch_size, shuffle, validation_split, num_workers)
+
+
+class Vessel12DataLoader(BaseDataLoader):
+    '''
+    Data loader for VascuSynth dataset
+    '''
+    def __init__(self, data_dir, batch_size, shuffle=True, validation_split=0.0, num_workers=1, training=True,):
+        self.data_dir = data_dir
+        self.dataset = Vessel12Dataset(data_dir, train=training)
+        super().__init__(self.dataset, batch_size, shuffle, validation_split, num_workers)
+
