@@ -163,3 +163,19 @@ class UNet(nn.Module):
             'bangle': bangle,
             'bwt': bwt,
         }
+
+
+if __name__ == "__main__":
+    net = UNet(bifurc=True)
+    x = {
+            'image': torch.rand(1, 1, 2336//4, 3504//4),
+    }
+    print(x['image'].shape)
+    with torch.no_grad():
+        out = net(x)
+    for k, v in out.items():
+        try:
+            print(k, v.shape)
+        except:
+            print(k, v)
+

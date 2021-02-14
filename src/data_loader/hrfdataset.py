@@ -52,9 +52,13 @@ class HRFDataset(Dataset):
 
         # Set up the mask and segmentation
         mask = self.masks[idx]
-        mask = Image.open(mask).resize((512, 512))
+        mask = Image.open(mask)
+        width, height = mask.width//4, mask.height//4
+        mask = mask.resize((width, height))
+
         seg = self.segs[idx]
-        seg = Image.open(seg).resize((512, 512))
+        seg = Image.open(seg)
+        seg = seg.resize((width, height))
 
         # Flip
         if flip:
@@ -80,7 +84,8 @@ class HRFDataset(Dataset):
 
         # Get image from data or gt segmentation
         img = self.images[idx]
-        img = Image.open(img).resize((512, 512))
+        img = Image.open(img)
+        img = img.resize((width, height))
         if flip:
             img = img.transpose(Image.FLIP_LEFT_RIGHT)
         img = img.rotate(90*rot)

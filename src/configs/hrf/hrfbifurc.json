@@ -10,7 +10,7 @@
             "mintheta": 0,
             "maxtheta": 110,
             "min_scale": 0.5,
-            "vessel_scale_factor": 4.5
+            "vessel_scale_factor": 5.5
         }
     },
     "log_dir": "/ocean/projects/asc170022p/rohit33/selfsupmodels",

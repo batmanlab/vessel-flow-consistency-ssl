@@ -12,3 +12,5 @@ from data_loader.vascu import *
 from data_loader.tubetkdataset import TubeTKDataset, TubeTKFullDataset
 from data_loader.vessel12dataset import Vessel12Dataset
 
+from data_loader.hrfdataset import HRFDataset
+
