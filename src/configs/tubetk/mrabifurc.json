@@ -16,7 +16,7 @@
         "type": "TubeTKMRADataLoader",
         "args": {
             "data_dir": "/ocean/projects/asc170022p/rohit33/TubeTK",
-            "batch_size": 4,
+            "batch_size": 3,
             "shuffle": true,
             "validation_split": 0,
             "full_data": true,

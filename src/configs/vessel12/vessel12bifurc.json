@@ -16,7 +16,7 @@
         "type": "Vessel12DataLoader",
         "args": {
             "data_dir": "/ocean/projects/asc170022p/rohit33/VESSEL12",
-            "batch_size": 4,
+            "batch_size": 3,
             "shuffle": true,
             "validation_split": 0,
             "num_workers": 4
