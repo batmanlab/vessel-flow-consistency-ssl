@@ -8,5 +8,6 @@ todo.md
 *.job
 *.out
 src/*png
+src/*/*png
 src/*pkl
 src/outputs/*pkl

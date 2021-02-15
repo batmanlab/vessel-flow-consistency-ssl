@@ -50,13 +50,14 @@ def main(config, args):
         config['data_loader']['args']['data_dir'],
         batch_size=512,
         shuffle=False,
-        toy=config['data_loader']['args']['toy'],
+        toy=config['data_loader']['args'].get('toy'),
         preprocessing=config['data_loader']['args'].get('preprocessing'),
         validation_split=0.0,
         training=training,
         augment=False,
         num_workers=2
     )
+    print(len(data_loader.dataset))
 
     ## Vesselness function
     if config.config['loss'] == 'vessel_loss_2d_sq':
@@ -151,7 +152,6 @@ def main(config, args):
                 except:
                     pass
 
-
             # Add the other frangi-like term
             '''
             ves2 = v2transpose_vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, mask=mask, is_crosscorr=False)
@@ -160,11 +160,13 @@ def main(config, args):
             '''
 
             # computing loss, metrics on test set
-            with open('{}_vesselness.pkl'.format(trainstr), 'wb') as fi:
+            vfilename = input("Enter filename for vesselness. ")
+            with open(vfilename, 'wb') as fi:
                 pkl.dump(ves, fi)
 
             # store everything in another pickle file
-            with open('{}_analysis.pkl'.format(trainstr), 'wb') as fi:
+            analysisfilename = input("Enter filename to save analysis. ")
+            with open(analysisfilename, 'wb') as fi:
                 torch.save({'data': data, 'output': output}, fi)
 
             I = np.random.randint(20)

@@ -108,5 +108,5 @@ if __name__ == "__main__":
     ds = HRFDataset("/ocean/projects/asc170022p/rohit33/HRF_dataset")
     d = ds[0]
     for k, v in d.items():
-        print(k, v.shape)
+        print(k, v.shape, v.min(), v.max())
 
