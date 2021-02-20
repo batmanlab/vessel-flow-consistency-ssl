@@ -14,7 +14,7 @@ from functools import lru_cache
 
 N = 32
 M = 80
-DIMS = (128, 448, 448)
+# DIMS = (128, 448, 448)
 
 # Number of patches for each image for easy querying
 trainPatchIds = [(7.0, 10.0, 10.0),
@@ -88,6 +88,7 @@ class Vessel12Dataset(Dataset):
         imgid, patchid = self._get_ids(idx)
         # Load image
         img = self.load_image(self.files[imgid]) + 0
+        shape = img.shape
         # Crop the image
         img, startcoord = self.crop(img, imgid, patchid)
 
@@ -97,6 +98,8 @@ class Vessel12Dataset(Dataset):
                 'image': torch.FloatTensor(img)[None],
                 'gt': 0,
                 'startcoord': torch.LongTensor(startcoord),
+                'shape': torch.LongTensor(shape),
+                'imgid': imgid,
         }
 
     def crop(self, img, imgid, patchid):
@@ -143,9 +146,9 @@ class Vessel12Dataset(Dataset):
 
 
 if __name__ == '__main__':
-    ds = Vessel12Dataset('/ocean/projects/asc170022p/rohit33/VESSEL12')
+    ds = Vessel12Dataset('/ocean/projects/asc170022p/rohit33/VESSEL12', train=False)
     print(len(ds))
     for _ in range(300):
         d  = ds[_]['image']
-        print(ds[_]['startcoord'])
+        print(ds[_]['startcoord'], 64 + ds[_]['startcoord'], ds[_]['shape'])
         print(d.shape, d.mean(), d.min(), d.max())

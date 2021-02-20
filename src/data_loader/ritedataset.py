@@ -75,8 +75,10 @@ class RITEDataset(Dataset):
             img = img[..., 1]  # extract green channel only
             # Apply more preprocessing
 
-        img = img[None]
         mask = (img > 20/255.0).astype(int)
+        mask = erosion(mask, np.ones((3, 3)))
+        img = img[None]
+        mask = mask[None]
         # Return [1, H, W] image and [1, H, W]
         return {
             'image': torch.FloatTensor(img),
@@ -86,7 +88,7 @@ class RITEDataset(Dataset):
 
 
 if __name__ == "__main__":
-    ds = RITEDataset("/ocean/projects/asc170022p/rohit33/RITE_dataset", train=True)
+    ds = RITEDataset("/ocean/projects/asc170022p/rohit33/RITE_dataset", train=not True)
     print(ds.images)
     print(len(ds))
     d = ds[0]
