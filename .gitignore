@@ -9,5 +9,7 @@ todo.md
 *.out
 src/*png
 src/*/*png
+src/pickles
+src/VESSEL12output
 src/*pkl
 src/outputs/*pkl

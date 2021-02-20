@@ -51,7 +51,7 @@ class TubeTKDataset(Dataset):
             self.alltre = self.alltre[N:]
 
         # Calculate number of patches per dimension
-        self.Np = [math.ceil(DIMS[i]/64.) for i in range(3)]
+        self.Np = [math.ceil((DIMS[i]-64)/48.)+1 for i in range(3)]
         self.numPatches = np.prod(np.array(self.Np))
         print("{} patches per image.".format(self.numPatches))
         self.buf = dict()
@@ -70,10 +70,12 @@ class TubeTKDataset(Dataset):
             pid = pid//self.Np[_]
 
         #print(patchid, pids)
-        pids = [64*_ for _ in pids]
+        pids = [48*_ + 64 for _ in pids]   # end coordinate
+        pids = [min(DIMS[i], x) for i,x in enumerate(pids)]
+        pids = [x - 64 for x in pids]
 
         h, w, d = pids
-        return img[h:h+64, w:w+64, d:d+64]
+        return img[h:h+64, w:w+64, d:d+64], [0, h, w, d]
 
 
     def load_image(self, imgfile):
@@ -99,18 +101,21 @@ class TubeTKDataset(Dataset):
 
         # Load image
         img = self.load_image(self.allmra[imgid]) + 0
+        shape = img.shape
         img = self.normalize(img + 0)
         #print(img.min(), img.max(), img.dtype)
         #print(img.min(), img.max())
-        img = self.crop(img, patchid)
+        img, startcoord = self.crop(img, patchid)
         return {
                 'image': torch.FloatTensor(img)[None],
                 'gt': 0,
+                'startcoord': torch.LongTensor(startcoord),
+                'shape': torch.LongTensor(shape),
         }
 
 
 
-class TubeTKFullDataset(Dataset):
+class TubeTKFullDataset(TubeTKDataset):
 
     def __init__(self, data_dir, train=True, offset=0):
         self.data_dir = data_dir
@@ -133,62 +138,11 @@ class TubeTKFullDataset(Dataset):
         else:
             self.allmra = self.allmra[M:]
         # Calculate number of patches per dimension
-        self.Np = [math.ceil(DIMS[i]/64.) for i in range(3)]
+        self.Np = [math.ceil((DIMS[i]-64)/48.)+1 for i in range(3)]
         self.numPatches = np.prod(np.array(self.Np))
         print("{} patches per image.".format(self.numPatches))
         #print(self.allmra)
         self.buf = dict()
-
-
-    def __len__(self,):
-        return len(self.allmra)*self.numPatches
-
-
-    def crop(self, img, patchid):
-        pids = []
-        # Get patchids
-        pid = patchid
-        for _ in range(3):
-            pids.append(pid%self.Np[_])
-            pid = pid//self.Np[_]
-
-        #print(patchid, pids)
-        pids = [64*_ for _ in pids]
-
-        h, w, d = pids
-        return img[h:h+64, w:w+64, d:d+64]
-
-
-    def load_image(self, imgfile):
-        if self.buf.get(imgfile) is None:
-            self.buf = dict()
-            img = sitk.ReadImage(imgfile)
-            img = sitk.GetArrayFromImage(img)*1.0
-            self.buf[imgfile] = img + 0
-        else:
-            img = self.buf[imgfile] + 0
-        return img
-
-
-    def normalize(self, img):
-        M = img.max()
-        m = img.min()
-        return 2*(img - m)/(M - m) - 1
-
-    def __getitem__(self, idx):
-        patchid = idx%self.numPatches
-        imgid = idx//self.numPatches
-
-        # Load image
-        img = self.load_image(self.allmra[imgid]) + 0
-        img = self.normalize(img + 0)
-        #print(img.min(), img.max(), img.dtype)
-        #print(img.min(), img.max())
-        img = self.crop(img, patchid)
-        return {
-                'image': torch.FloatTensor(img)[None],
-                'gt': 0,
-        }
 
 
 
@@ -197,5 +151,6 @@ if __name__ == '__main__':
     ds = TubeTKFullDataset('/ocean/projects/asc170022p/rohit33/TubeTK')
     print(len(ds))
     for _ in range(60):
-        d  = ds[_]['image']
-        print(d.shape, d.mean(), d.min(), d.max())
+        d  = ds[_]
+        #print(d.shape, d.mean(), d.min(), d.max())
+        print(d['startcoord'], d['startcoord']+64, d['shape'])

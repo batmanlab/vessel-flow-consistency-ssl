@@ -13,6 +13,7 @@ from parse_config import ConfigParser
 from utils import dir2flow_2d, v2vesselness, v2transpose_vesselness, overlay, overlay_quiver
 from utils.util import *
 from model.loss import v2_avg
+from time import time
 
 def to_device(data, device):
     for k, v in data.items():
@@ -38,6 +39,9 @@ def main(config, args):
 
     training = True if args.train else False
     trainstr = "train" if args.train != 0 else "test"
+
+    # Keep track of time
+    times = []
 
     data_loader = getattr(module_data, config['data_loader']['type'])(
         config['data_loader']['args']['data_dir'],
@@ -111,7 +115,7 @@ def main(config, args):
 
     with torch.no_grad():
         # Store all stuff here
-        vesselness = dict(imgid=None, img=None, count=None)
+        vesselness = dict(imgid=None, img=None, count=0)
 
         for j, data in enumerate(tqdm(data_loader)):
             ## Get output from model
@@ -124,9 +128,13 @@ def main(config, args):
                 mask = mask.cpu()
 
             ## Change this for different vesselness modes
+            t1 = time()
             ves = vesselfunc(data['image'], output, nsample=nsample, vtype=vessel_type, mask=mask, is_crosscorr=args.crosscorr, parallel_scale=parallel_scale, sv_range=sv_range)
+            t2 = time()
             ves = ves.data.cpu().numpy()
             ves = smooth(ves, s)
+            times.append(t2 - t1)
+            #print(t2 - t1)
             #print(ves.shape)
 
             # From this vesselness, use it to add to current image
@@ -141,10 +149,10 @@ def main(config, args):
                     # Save it first
                     v_id = vesselness['imgid']
                     v_img = vesselness['img']
+                    v_cnt = np.maximum(1, vesselness['count'])
 
                     # Save this image if it exists
                     if v_id is not None:
-                        v_cnt = np.maximum(1, vesselness['count'])
 
                         ves_img = v_img / v_cnt
                         zerocount = np.where(v_cnt == 0)
@@ -192,6 +200,10 @@ def main(config, args):
             np.save(fi, ves_img)
         print("Saved to {}".format(outputfile))
 
+        # Print time stats
+        meantime = np.mean(times)
+        stdtime = np.std(times)
+        print("Time for {}: {} +- {} sec".format(args.vesselfunc, meantime, stdtime))
 
 
 if __name__ == '__main__':

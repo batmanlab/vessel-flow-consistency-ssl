@@ -16,6 +16,7 @@ from utils.util import *
 from model.loss import v2_avg
 from skimage.filters import frangi, sato, meijering, hessian
 from functools import partial
+from time import time
 
 VESSELFUNC = {
         'frangi': frangi,
@@ -40,6 +41,9 @@ def main(config, args):
         num_workers=2,
     )
 
+    # Keep track of times
+    times = []
+
     # Vessel function with partial args filled in
     vfunc = partial(VESSELFUNC[args.vesselfunc], sigmas=np.linspace(1, 12, 6), black_ridges=False, mode='constant')
 
@@ -49,14 +53,20 @@ def main(config, args):
     print("Dataset has size: {}".format(len(data_loader.dataset)))
     with torch.no_grad():
         # Store all stuff here
-        vesselness = dict(imgid=None, img=None, count=None)
+        vesselness = dict(imgid=None, img=None, count=0)
 
         for j, data in enumerate(tqdm(data_loader)):
             ## Get output from model
-            imgs = data['image']
+            imgs = data['image'].data.numpy()
             fragimg = [x[0] for x in imgs]
+
+            # Record time
+            t1 = time()
             fragves = pool.map(vfunc, fragimg)
             ves = np.array(fragves)
+            t2 = time()
+            times.append(t2 - t1)
+            #print(t2 - t1)
 
             # From this vesselness, use it to add to current image
             B = ves.shape[0]
@@ -69,11 +79,10 @@ def main(config, args):
                     # Save it first
                     v_id = vesselness['imgid']
                     v_img = vesselness['img']
+                    v_cnt = np.maximum(1, vesselness['count'])
 
                     # Save this image if it exists
                     if v_id is not None:
-                        v_cnt = np.maximum(1, vesselness['count'])
-
                         ves_img = v_img / v_cnt
                         zerocount = np.where(v_cnt == 0)
                         if zerocount[0] != []:   # Print a warning is some location has zero index
@@ -116,6 +125,11 @@ def main(config, args):
         with open(outputfile, 'wb') as fi:
             np.save(fi, ves_img)
         print("Saved to {}".format(outputfile))
+
+        # Print time stats
+        meantime = np.mean(times)
+        stdtime = np.std(times)
+        print("Time for {}: {} +- {} sec".format(args.vesselfunc, meantime, stdtime))
 
 
 
