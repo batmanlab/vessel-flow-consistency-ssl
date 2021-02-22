@@ -38,7 +38,7 @@ def main(config, args):
         shuffle=False,
         validation_split=0.0,
         training=training,
-        num_workers=2,
+        num_workers=4,
     )
 
     # Keep track of times
@@ -48,6 +48,8 @@ def main(config, args):
     vfunc = partial(VESSELFUNC[args.vesselfunc], sigmas=np.linspace(1, 12, 6), black_ridges=False, mode='constant')
 
     # Create pool for parallel jobs
+    print(mp.cpu_count())
+
     pool = mp.Pool(args.num_cores)
 
     print("Dataset has size: {}".format(len(data_loader.dataset)))
@@ -63,6 +65,7 @@ def main(config, args):
             # Record time
             t1 = time()
             fragves = pool.map(vfunc, fragimg)
+            #fragves = [vfunc(x) for x in fragimg]
             ves = np.array(fragves)
             t2 = time()
             times.append(t2 - t1)
@@ -88,7 +91,7 @@ def main(config, args):
                         if zerocount[0] != []:   # Print a warning is some location has zero index
                             print("{} index has zero count in location {}".format(v_id, zerocount))
 
-                        outputfile = 'VESSEL12output/{}_{}.npy'.format(args.vesselfunc, v_id)
+                        outputfile = '/ocean/projects/asc170022p/rohit33/VESSEL12output/{}_{}.npy'.format(args.vesselfunc, v_id)
                         print(v_cnt.min(), v_cnt.max())
                         with open(outputfile, 'wb') as fi:
                             np.save(fi, ves_img)
@@ -120,7 +123,7 @@ def main(config, args):
         if zerocount[0] != []:   # Print a warning is some location has zero index
             print("{} index has zero count in location {}".format(v_id, zerocount))
 
-        outputfile = 'VESSEL12output/{}_{}.npy'.format(args.vesselfunc, v_id)
+        outputfile = '/ocean/projects/asc170022p/rohit33/VESSEL12output/{}_{}.npy'.format(args.vesselfunc, v_id)
         print(v_cnt.min(), v_cnt.max())
         with open(outputfile, 'wb') as fi:
             np.save(fi, ves_img)

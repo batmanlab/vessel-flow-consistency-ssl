@@ -169,12 +169,12 @@ class TubeTKMRADataLoader(BaseDataLoader):
     '''
     Data loader for VascuSynth dataset
     '''
-    def __init__(self, data_dir, batch_size, shuffle=True, validation_split=0.0, num_workers=1, training=True, full_data=True):
+    def __init__(self, data_dir, batch_size, shuffle=True, validation_split=0.0, num_workers=1, training=True, full_data=True, offset=0):
         self.data_dir = data_dir
         if full_data:
-            self.dataset = TubeTKFullDataset(data_dir, train=training)
+            self.dataset = TubeTKFullDataset(data_dir, train=training, offset=offset)
         else:
-            self.dataset = TubeTKDataset(data_dir, train=training)
+            self.dataset = TubeTKDataset(data_dir, train=training, offset=offset)
         super().__init__(self.dataset, batch_size, shuffle, validation_split, num_workers)
 
 

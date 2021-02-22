@@ -48,8 +48,10 @@ def main(config, args):
         batch_size=args.batch_size,
         shuffle=False,
         validation_split=0.0,
+        full_data=0,
         training=training,
         num_workers=2,
+        offset=31,
     )
 
     ## Vesselness function (3d versions only here)
@@ -120,6 +122,11 @@ def main(config, args):
         for j, data in enumerate(tqdm(data_loader)):
             ## Get output from model
             data = to_device(data, device)
+
+            # Check if file already exists
+            imgidlast = data['imgid'][-1]
+            outputfile = '/ocean/projects/asc170022p/rohit33/TubeTKoutput/ours_{}.npy'.format(imgidlast)
+
             output = model(data)
             ## Get vessels
             vessel_type = config.get('vessel_type', 'light')
@@ -143,9 +150,10 @@ def main(config, args):
                 imgid = data['imgid'][i]
                 shape = list(data['shape'][i])
 
+                outputfile = '/ocean/projects/asc170022p/rohit33/TubeTKoutput/ours_{}.npy'.format(imgid)
+
                 # New image, save old image and create new templates
                 if imgid != vesselness['imgid']:
-
                     # Save it first
                     v_id = vesselness['imgid']
                     v_img = vesselness['img']
@@ -159,7 +167,7 @@ def main(config, args):
                         if zerocount[0] != []:   # Print a warning is some location has zero index
                             print("{} index has zero count in location {}".format(v_id, zerocount))
 
-                        outputfile = '/ocean/projects/asc170022p/rohit33/VESSEL12output/ours_{}.npy'.format(v_id)
+                        outputfile = '/ocean/projects/asc170022p/rohit33/TubeTKoutput/ours_{}.npy'.format(v_id)
                         print(v_cnt.min(), v_cnt.max())
                         with open(outputfile, 'wb') as fi:
                             np.save(fi, ves_img)
@@ -194,7 +202,7 @@ def main(config, args):
         if zerocount[0] != []:   # Print a warning is some location has zero index
             print("{} index has zero count in location {}".format(v_id, zerocount))
 
-        outputfile = '/ocean/projects/asc170022p/rohit33/VESSEL12output/ours_{}.npy'.format(v_id)
+        outputfile = '/ocean/projects/asc170022p/rohit33/TubeTKoutput/ours_{}.npy'.format(v_id)
         print(v_cnt.min(), v_cnt.max())
         with open(outputfile, 'wb') as fi:
             np.save(fi, ves_img)

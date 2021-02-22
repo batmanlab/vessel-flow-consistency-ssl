@@ -35,6 +35,7 @@ class TubeTKDataset(Dataset):
             allmra.append(mra)
 
         # Get an offset
+        self.offset = offset
         if offset > 0:
             allmra = allmra[offset:] + allmra[:offset]
             alltre = alltre[offset:] + alltre[:offset]
@@ -43,12 +44,8 @@ class TubeTKDataset(Dataset):
         self.alltre = alltre
 
         # Split according to train or test
-        if train:
-            self.allmra = self.allmra[:N]
-            self.alltre = self.alltre[:N]
-        else:
-            self.allmra = self.allmra[N:]
-            self.alltre = self.alltre[N:]
+        self.allmra = self.allmra
+        self.alltre = self.alltre
 
         # Calculate number of patches per dimension
         self.Np = [math.ceil((DIMS[i]-64)/48.)+1 for i in range(3)]
@@ -108,7 +105,9 @@ class TubeTKDataset(Dataset):
         img, startcoord = self.crop(img, patchid)
         return {
                 'image': torch.FloatTensor(img)[None],
+                'path': self.allmra[imgid],
                 'gt': 0,
+                'imgid': (imgid + self.offset)%len(self.allmra),
                 'startcoord': torch.LongTensor(startcoord),
                 'shape': torch.LongTensor(shape),
         }
@@ -147,10 +146,16 @@ class TubeTKFullDataset(TubeTKDataset):
 
 
 if __name__ == '__main__':
-    #ds = TubeTKDataset('/ocean/projects/asc170022p/rohit33/TubeTK')
-    ds = TubeTKFullDataset('/ocean/projects/asc170022p/rohit33/TubeTK')
+    off = 31
+    ds = TubeTKDataset('/ocean/projects/asc170022p/rohit33/TubeTK', offset=off)
+    #print(ds.allmra)
+    for i, x in enumerate(ds.allmra):
+        print(i, x)
+
+    #ds = TubeTKFullDataset('/ocean/projects/asc170022p/rohit33/TubeTK')
     print(len(ds))
-    for _ in range(60):
-        d  = ds[_]
+    for _ in range(260):
+        d  = ds[_*200]
+        print(d['imgid'], d['path'])
         #print(d.shape, d.mean(), d.min(), d.max())
-        print(d['startcoord'], d['startcoord']+64, d['shape'])
+        #print(d['startcoord'], d['startcoord']+64, d['shape'])

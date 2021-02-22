@@ -176,10 +176,13 @@ class BaseTrainer:
             print("Loaded with module")
 
         # clear last layers
-        if module:
-            self.model.module.reinit_last_layers()
-        else:
-            self.model.reinit_last_layers()
+        try:
+            try:
+                self.model.module.reinit_last_layers()
+            except:
+                self.model.reinit_last_layers()
+        except:
+            pass
 
         # load optimizer state from checkpoint only when optimizer type is not changed.
         if checkpoint['config']['optimizer']['type'] != self.config['optimizer']['type']:
