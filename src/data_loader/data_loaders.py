@@ -182,9 +182,19 @@ class Vessel12DataLoader(BaseDataLoader):
     '''
     Data loader for VascuSynth dataset
     '''
-    def __init__(self, data_dir, batch_size, shuffle=True, validation_split=0.0, num_workers=1, training=True,):
+    def __init__(self, data_dir, batch_size, shuffle=True, validation_split=0.0, num_workers=1, training=True, pad=0):
         self.data_dir = data_dir
-        self.dataset = Vessel12Dataset(data_dir, train=training)
+        self.dataset = Vessel12Dataset(data_dir, train=training, pad=pad)
+        super().__init__(self.dataset, batch_size, shuffle, validation_split, num_workers)
+
+
+class IrcadDataLoader(BaseDataLoader):
+    '''
+    Data loader for VascuSynth dataset
+    '''
+    def __init__(self, data_dir, batch_size, shuffle=True, validation_split=0.0, num_workers=1, training=True, pad=0):
+        self.data_dir = data_dir
+        self.dataset = IrcadDataset(data_dir, train=training, pad=pad)
         super().__init__(self.dataset, batch_size, shuffle, validation_split, num_workers)
 
 

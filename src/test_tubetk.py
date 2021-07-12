@@ -22,6 +22,9 @@ def to_device(data, device):
 
 def smooth(ves, s=1):
     # image = [B, C, H, W]
+    if s == 0:
+        return ves
+
     smoothves = ves * 0
     B, C, H, W, D = ves.shape
     for b in range(B):
@@ -51,7 +54,7 @@ def main(config, args):
         full_data=0,
         training=training,
         num_workers=2,
-        offset=31,
+        offset=8,
     )
 
     ## Vesselness function (3d versions only here)
@@ -64,7 +67,7 @@ def main(config, args):
     elif config.config['loss'] == 'vessel_loss_3d_bifurc':
         vesselfunc = v13d_sq_jointvesselness
     elif config.config['loss'] == 'vessel_loss_3dmax':
-        vesselfunc = v13d_sqmax_vesselness
+        vesselfunc = v13d_sqmax_vesselness_test
     else:
         assert False, 'Unknown loss function {}'.format(config['loss'])
     print(vesselfunc)
@@ -74,6 +77,7 @@ def main(config, args):
         s = 1
     else:
         s = 0.7
+    s = 0
     print("Smoothness {}".format(s))
 
     # More information
@@ -211,7 +215,7 @@ def main(config, args):
         # Print time stats
         meantime = np.mean(times)
         stdtime = np.std(times)
-        print("Time for {}: {} +- {} sec".format(args.vesselfunc, meantime, stdtime))
+        print("Time for {}: {} +- {} sec".format("ours", meantime, stdtime))
 
 
 if __name__ == '__main__':

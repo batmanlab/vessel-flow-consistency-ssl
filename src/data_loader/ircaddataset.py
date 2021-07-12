@@ -1,4 +1,5 @@
 import os
+import glob
 import math
 import numpy as np
 from os import path as osp
@@ -12,29 +13,29 @@ import nibabel as nib
 import SimpleITK as sitk
 from functools import lru_cache
 
-N = 32
-M = 80
-# DIMS = (128, 448, 448)
+patchIds = [[2, 6, 7],
+ [2, 4, 7],
+ [3, 4, 5],
+ [3, 7, 6],
+ [3, 6, 6],
+ [1, 5, 6],
+ [2, 5, 5],
+ [3, 6, 6],
+ [2, 6, 5],
+ [2, 5, 7],
+ [3, 5, 9],
+ [2, 5, 5]]
 
-# Number of patches for each image for easy querying
-trainPatchIds = [(8.0, 11.0, 11.0), (9.0, 11.0, 11.0), (11.0, 11.0, 11.0), (9.0, 11.0, 11.0), (9.0, 11.0, 11.0), (8.0, 11.0, 11.0), (10.0, 11.0, 11.0), (9.0, 11.0, 11.0), (11.0, 11.0, 11.0), (9.0, 11.0, 11.0), (9.0, 11.0, 11.0), (9.0, 11.0, 11.0), (10.0, 11.0, 11.0), (8.0, 11.0, 11.0), (8.0, 11.0, 11.0), (10.0, 11.0, 11.0), (9.0, 11.0, 11.0), (9.0, 11.0, 11.0), (8.0, 11.0, 11.0), (9.0, 11.0, 11.0)]
+numPatches = [84, 56, 60, 126, 108, 30, 50, 108, 60, 70, 135, 50]
 
-trainNumPatches = [968.0, 1089.0, 1331.0, 1089.0, 1089.0, 968.0, 1210.0, 1089.0, 1331.0, 1089.0, 1089.0, 1089.0, 1210.0, 968.0, 968.0, 1210.0, 1089.0, 1089.0, 968.0, 1089.0]
 
-# Testing
-testPatchIds = [(10.0, 11.0, 11.0), (9.0, 11.0, 11.0), (9.0, 11.0, 11.0)]
-testNumPatches = [1210.0, 1089.0, 1089.0]
-
-class Vessel12Dataset(Dataset):
+class IrcadDataset(Dataset):
 
     def __init__(self, data_dir, train=True, offset=0, pad=0):
         self.data_dir = data_dir
-        if train:
-            self.patchids = trainPatchIds
-            self.numpatches = trainNumPatches
-        else:
-            self.patchids = testPatchIds
-            self.numpatches = testNumPatches
+
+        self.patchids = patchIds
+        self.numpatches = numPatches
 
         self.pad = pad
 
@@ -42,25 +43,9 @@ class Vessel12Dataset(Dataset):
         self.cnumpatches = np.cumsum(self.numpatches)
 
         trainstr = 'train' if train else 'test'
-        self.dirname = osp.join(data_dir, trainstr)
-        # Read images
-        for r, dirs, files in os.walk(self.dirname):
-            files = map(lambda x: osp.join(r, x), files)
-            files = filter(lambda x: x.endswith('mhd'), files)
-            files = sorted(list(files))
-            break
-
-        self.files = files
-
-        # Get annotations files
-        csvs = None
-        if os.path.exists(osp.join(self.dirname, 'Annotations')):
-            for r, dirs, csvs in os.walk(osp.join(self.dirname, 'Annotations')):
-                csvs = map(lambda x: os.path.join(r, x), csvs)
-                csvs = filter(lambda x: x.endswith('csv'), csvs)
-                csvs = sorted(list(csvs))
-                break
-            self.csvs = csvs
+        self.seg = glob.glob(osp.join(data_dir, "*/venoussystem.nii.gz"))
+        self.seg = sorted(self.seg)
+        self.files = [x.replace('venoussystem', 'image') for x in self.seg]
 
 
     def __len__(self,):
@@ -74,8 +59,6 @@ class Vessel12Dataset(Dataset):
         shape = img.shape
         # Crop the image
         img, startcoord = self.crop(img, imgid, patchid)
-
-        img = self.normalize(img + 0)
 
         return {
                 'image': torch.FloatTensor(img)[None],
@@ -108,7 +91,7 @@ class Vessel12Dataset(Dataset):
         pad = self.pad
         if pad > 0:
             H, W, D = img.shape
-            imgbig = np.zeros((H + 2*pad, W + 2*pad, D + 2*pad)) - 900
+            imgbig = np.zeros((H + 2*pad, W + 2*pad, D + 2*pad)) - 1
             imgbig[pad:-pad, pad:-pad, pad:-pad] = img
             return imgbig[h:h+64+2*pad, w:w+64+2*pad, d:d+64+2*pad],  [imgid, h, w, d]
         else:
@@ -118,6 +101,13 @@ class Vessel12Dataset(Dataset):
     def load_image(self, imgfile):
         img = sitk.ReadImage(imgfile)
         img = sitk.GetArrayFromImage(img)*1.0
+        m = img.min()
+        M = img.max()
+        img = 2*(img - m)/(M - m) - 1
+        # Pad it if necessary
+        H, W, D = img.shape
+        newimg = np.zeros((max(H, 64), max(W, 64), max(D, 64))) - 1
+        newimg[:H, :W, :D] = img
         return img
 
 
@@ -139,7 +129,7 @@ class Vessel12Dataset(Dataset):
 
 
 if __name__ == '__main__':
-    ds = Vessel12Dataset('/ocean/projects/asc170022p/rohit33/VESSEL12', train=False)
+    ds = IrcadDataset('/ocean/projects/asc170022p/rohit33/Liver', train=False)
     print(len(ds))
     for _ in range(300):
         d  = ds[_]['image']

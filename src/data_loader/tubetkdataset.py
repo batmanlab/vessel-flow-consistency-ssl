@@ -56,6 +56,7 @@ class TubeTKDataset(Dataset):
 
     def __len__(self,):
         return len(self.allmra)*self.numPatches
+        #return 10*self.numPatches
 
 
     def crop(self, img, patchid):
@@ -95,6 +96,7 @@ class TubeTKDataset(Dataset):
     def __getitem__(self, idx):
         patchid = idx%self.numPatches
         imgid = idx//self.numPatches
+        #imgid = np.random.randint(len(self.allmra))
 
         # Load image
         img = self.load_image(self.allmra[imgid]) + 0
@@ -105,7 +107,7 @@ class TubeTKDataset(Dataset):
         img, startcoord = self.crop(img, patchid)
         return {
                 'image': torch.FloatTensor(img)[None],
-                'path': self.allmra[imgid],
+                #'path': self.allmra[imgid],
                 'gt': 0,
                 'imgid': (imgid + self.offset)%len(self.allmra),
                 'startcoord': torch.LongTensor(startcoord),
@@ -126,6 +128,7 @@ class TubeTKFullDataset(TubeTKDataset):
             allmra.extend(files)
 
         # Get an offset
+        self.offset = offset
         if offset > 0:
             allmra = allmra[offset:] + allmra[:offset]
 
