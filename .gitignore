@@ -15,3 +15,4 @@ src/*pkl
 src/outputs/*pkl
 src/**/.ipynb_checkpoints
 src/*jobs
+src/oldnotebooks
