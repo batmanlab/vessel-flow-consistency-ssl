@@ -13,3 +13,5 @@ src/pickles
 src/VESSEL12output
 src/*pkl
 src/outputs/*pkl
+src/**/.ipynb_checkpoints
+src/*jobs
