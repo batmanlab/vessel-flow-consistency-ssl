@@ -1,3 +1,0 @@
-sbatch -p GPU-AI -A ac5616p -t 6:00:00 --export=RUN_ID=v1-6hours --gres=gpu:volta16:1 strlinesunetdampen.job
-python test.py -c /pghbio/dbmi/batmanlab/rohit33/saved_models/models/drive_vessel_mask_contrast/v2-scale8-contrast/config.json --resume /pghbio/dbmi/batmanlab/rohit33/saved_models/models/drive_vessel_mask_contrast/v2-scale8-contrast/checkpoint-epoch975.pth
-sbatch -p GPU-AI -A ac5616p -t 3:00:00 --export=RUN_ID=sq8 --gres=gpu:volta16:1 jobs/drivesq8.job
