@@ -63,11 +63,5 @@ def main():
             nib.save(fVesselness, filename + '-v.nii.gz')
 
 
-
-
-
-
-
-
 if __name__ == '__main__':
     main()
