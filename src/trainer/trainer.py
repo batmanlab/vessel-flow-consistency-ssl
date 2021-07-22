@@ -8,6 +8,8 @@ from utils import inf_loop, MetricTracker
 class Trainer(BaseTrainer):
     """
     Trainer class
+
+    Base trainer class, this is not going to be used beyond an abstract class for this project
     """
     def __init__(self, model, criterion, metric_ftns, optimizer, config, data_loader,
                  valid_data_loader=None, lr_scheduler=None, len_epoch=None):

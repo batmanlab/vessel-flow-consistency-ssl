@@ -7,7 +7,8 @@ from utils import dir2flow_2d, v2vesselness, overlay, overlay_quiver
 from utils.util import *
 
 def squeeze_batch(data):
-    # Squeeze the first and second indices into 1
+    # Squeeze the first and second indices into the first index
+    # works with data with data dicts
     for k, v in data.items():
         shape = list(v.shape)
         shape = [shape[0]*shape[1]] + shape[2:]
@@ -15,10 +16,12 @@ def squeeze_batch(data):
         data[k] = v
     return data
 
-
 class COPDTrainer(BaseTrainer):
     """
-    Trainer class
+    COPDTrainer class
+
+    Although it is named COPDTrainer class, it is valid for all 3D datasets used in this project.
+
     model: network architecture
     criterion: loss function to train on
     metric_ftns: set of metrics to check for validation
@@ -108,34 +111,13 @@ class COPDTrainer(BaseTrainer):
             mask = data.get('mask')
             if mask is not None:
                 mask = mask.cpu()
-
-            # Every few steps, add some images
-            if epoch % self.img_log_step == 0 and batch_idx == 0:
-                """
-                self.writer.add_image('input', make_grid(0.5 + 0.5*data['image'].detach().cpu(), nrow=4, normalize=True))
-                self.writer.add_image('recon', make_grid(0.5 + 0.5*output['recon'].detach().cpu(), nrow=4, normalize=True))
-                self.writer.add_image('v_x', make_grid(output['vessel'][:, 0:1].detach().cpu(), nrow=4, normalize=True))
-                self.writer.add_image('v_y', make_grid(output['vessel'][:, 1:2].detach().cpu(), nrow=4, normalize=True))
-                #self.writer.add_image('flow', make_grid(dir2flow_2d(output['vessel'][:, 0:2].cpu()), nrow=4, normalize=True))
-                #self.writer.add_image('flow_rev', make_grid(dir2flow_2d(output['vessel'][:, 2:4].cpu(), ret_mag=True), nrow=4, normalize=True))
-                self.writer.add_image('flow', make_grid(overlay_quiver(data['image'].detach().cpu(), output['vessel'][:, 0:2].detach().cpu(), quiverscale, normflow), nrow=4, normalize=True))
-                self.writer.add_image('flow_rev', make_grid(overlay_quiver(data['image'].detach().cpu(), output['vessel'][:, 2:4].detach().cpu(), quiverscale, normflowrev), nrow=4, normalize=True))
-                self.writer.add_image('v2_vesselness_only', make_grid(self.vesselfunc(data['image'].detach().cpu(), output['vessel'][:, 2:4].detach().cpu(), vtype=vessel_type, \
-                        mask = mask, v1 = output['vessel'][:, :2].detach().cpu(), parallel_scale=parallel_scale), nrow=4, normalize=True))
-                ves = self.vesselfunc(data['image'].detach().cpu(), output['vessel'][:, 2:4].detach().cpu(), vtype=vessel_type, mask=mask, v1 = output['vessel'][:, :2].detach().cpu(), parallel_scale=parallel_scale)
-                overlay_img = overlay(data['image'].detach().cpu(), ves.data.detach().cpu())
-                self.writer.add_image('v2_vesselness_overlay', make_grid(overlay_img, nrow=4, normalize=True))
-
-                # Cross correlation vesselness
-                ves = self.vesselfunc(data['image'].detach().cpu(), output['vessel'][:, 2:4].detach().cpu(), vtype=vessel_type, mask=mask, is_crosscorr=True, v1 = output['vessel'][:, :2].detach().cpu(), parallel_scale=parallel_scale)
-                self.writer.add_image('v2_vesselness_crosscorr', make_grid(ves.data.detach().cpu(), nrow=4, normalize=True))
-
-                #print(output['vessel'].max(), output['vessel'].min())
-                """
-                pass
-
+            
+            # Code for adding new images is removed because we have 3D patches now, which are hard and 
+            # expensive to visualize over Tensorboard 
             if batch_idx == self.len_epoch:
                 break
+
+        # log all training metrics
         log = self.train_metrics.result()
 
         if self.do_validation:
@@ -180,28 +162,6 @@ class COPDTrainer(BaseTrainer):
                 mask = data.get('mask')
                 if mask is not None:
                     mask = mask.cpu()
-
-                if epoch % self.img_log_step == 0 and batch_idx == 0:
-                    """
-                    self.writer.add_image('input', make_grid(0.5 + 0.5*data['image'].cpu(), nrow=4, normalize=True))
-                    self.writer.add_image('recon', make_grid(0.5 + 0.5*output['recon'].cpu(), nrow=4, normalize=True))
-                    self.writer.add_image('v_x', make_grid(output['vessel'][:, 0:1].cpu(), nrow=4, normalize=True))
-                    self.writer.add_image('v_y', make_grid(output['vessel'][:, 1:2].cpu(), nrow=4, normalize=True))
-                    #self.writer.add_image('flow', make_grid(dir2flow_2d(output['vessel'][:, 0:2].cpu()), nrow=4, normalize=True))
-                    #self.writer.add_image('flow_rev', make_grid(dir2flow_2d(output['vessel'][:, 2:4].cpu(), ret_mag=True), nrow=4, normalize=True))
-                    self.writer.add_image('flow', make_grid(overlay_quiver(data['image'].cpu(), output['vessel'][:, 0:2].cpu(), quiverscale, normflow), nrow=4, normalize=True))
-                    self.writer.add_image('flow_rev', make_grid(overlay_quiver(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), quiverscale, normflowrev), nrow=4, normalize=True))
-                    self.writer.add_image('v2_vesselness_only', make_grid(self.vesselfunc(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, \
-                            mask=mask, v1 = output['vessel'][:, :2].cpu(), parallel_scale=parallel_scale), nrow=4, normalize=True))
-                    ves = self.vesselfunc(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, mask=mask, v1 = output['vessel'][:, :2].cpu(), parallel_scale=parallel_scale)
-                    overlay_img = overlay(data['image'].cpu(), ves)
-                    self.writer.add_image('v2_vesselness_overlay', make_grid(overlay_img, nrow=4, normalize=True))
-
-                    # Cross correlation vesselness
-                    ves = self.vesselfunc(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, mask=mask, is_crosscorr=True, v1 = output['vessel'][:, :2].cpu(), parallel_scale=parallel_scale)
-                    self.writer.add_image('v2_vesselness_crosscorr', make_grid(ves, nrow=4, normalize=True))
-                    """
-                    pass
 
         # add histogram of model parameters to the tensorboard
         for name, p in self.model.named_parameters():

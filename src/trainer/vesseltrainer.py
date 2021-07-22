@@ -9,6 +9,9 @@ from utils.util import *
 class VesselTrainer(BaseTrainer):
     """
     Trainer class
+
+    This trainer class is valid for all 2D datasets.
+
     model: network architecture
     criterion: loss function to train on
     metric_ftns: set of metrics to check for validation
@@ -39,6 +42,15 @@ class VesselTrainer(BaseTrainer):
         self.valid_metrics = MetricTracker('loss', *[m.__name__ for m in self.metric_ftns], writer=self.writer)
 
         # Change v2vesselness function here
+        ''' vesselness function zoo
+
+        The vesselness function converts the network outputs (radius, vessel flow, bifurcation flow) into a 'vesselness' score.
+        This vesselness score is then used to train the template loss in the self-supervised flow consistency framework.
+
+        Refer to the definitions of the individual functions for their implementation.
+        Some 'vesselness' functions are simply proxies that return the network output as the vesselness.
+        This output can then be trained with whatever self-supervised loss function we want.
+        '''
         if self.config['loss'] == 'vessel_loss_2d_sq':
             self.vesselfunc = v2_sq_vesselness
         elif self.config['loss'] == 'vessel_loss_2d_path':
@@ -68,10 +80,14 @@ class VesselTrainer(BaseTrainer):
             self.vesselfunc = self_supervised_image
         else:
             assert False, 'Unknown loss function {}'.format(self.config['loss'])
-
         print("Using vesselness function", self.vesselfunc)
 
+
     def _to_device(self, data):
+        '''Simple helper function to move all data (given as a key,value dict) values into the given device (which is usually a specified GPU)
+        
+        Currently only supports a single GPU.
+        '''
         for k, v in data.items():
             data[k] = v.to(self.device)
         return data
@@ -89,7 +105,6 @@ class VesselTrainer(BaseTrainer):
         normflow = params.get('normalize_flow', True)
         normflowrev = params.get('normalize_flow_rev', True)
         quiverscale = params.get('quiver_scale', 2)
-
 
         self.model.train()
         self.train_metrics.reset()
@@ -135,8 +150,6 @@ class VesselTrainer(BaseTrainer):
                 self.writer.add_image('recon', make_grid(0.5 + 0.5*output['recon'].detach().cpu(), nrow=4, normalize=True))
                 self.writer.add_image('v_x', make_grid(output['vessel'][:, 0:1].detach().cpu(), nrow=4, normalize=True))
                 self.writer.add_image('v_y', make_grid(output['vessel'][:, 1:2].detach().cpu(), nrow=4, normalize=True))
-                #self.writer.add_image('flow', make_grid(dir2flow_2d(output['vessel'][:, 0:2].cpu()), nrow=4, normalize=True))
-                #self.writer.add_image('flow_rev', make_grid(dir2flow_2d(output['vessel'][:, 2:4].cpu(), ret_mag=True), nrow=4, normalize=True))
                 self.writer.add_image('flow', make_grid(overlay_quiver(data['image'].detach().cpu(), output['vessel'][:, 0:2].detach().cpu(), quiverscale, normflow), nrow=4, normalize=True))
                 self.writer.add_image('flow_rev', make_grid(overlay_quiver(data['image'].detach().cpu(), output['vessel'][:, 2:4].detach().cpu(), quiverscale, normflowrev), nrow=4, normalize=True))
                 self.writer.add_image('v2_vesselness_only', make_grid(self.vesselfunc(data['image'].detach().cpu(), outputviz, vtype=vessel_type, \
@@ -149,8 +162,6 @@ class VesselTrainer(BaseTrainer):
                 ves = self.vesselfunc(data['image'].detach().cpu(), outputviz, vtype=vessel_type, mask=mask, is_crosscorr=True, v1 = output['vessel'][:, :2].detach().cpu(), parallel_scale=parallel_scale)
                 self.writer.add_image('v2_vesselness_crosscorr', make_grid(ves.data.detach().cpu(), nrow=4, normalize=True))
 
-                #print(output['vessel'].max(), output['vessel'].min())
-
             if batch_idx == self.len_epoch:
                 break
         log = self.train_metrics.result()
@@ -162,6 +173,7 @@ class VesselTrainer(BaseTrainer):
         if self.lr_scheduler is not None:
             self.lr_scheduler.step()
         return log
+
 
     def _valid_epoch(self, epoch):
         """
@@ -212,8 +224,6 @@ class VesselTrainer(BaseTrainer):
                     self.writer.add_image('recon', make_grid(0.5 + 0.5*output['recon'].cpu(), nrow=4, normalize=True))
                     self.writer.add_image('v_x', make_grid(output['vessel'][:, 0:1].cpu(), nrow=4, normalize=True))
                     self.writer.add_image('v_y', make_grid(output['vessel'][:, 1:2].cpu(), nrow=4, normalize=True))
-                    #self.writer.add_image('flow', make_grid(dir2flow_2d(output['vessel'][:, 0:2].cpu()), nrow=4, normalize=True))
-                    #self.writer.add_image('flow_rev', make_grid(dir2flow_2d(output['vessel'][:, 2:4].cpu(), ret_mag=True), nrow=4, normalize=True))
                     self.writer.add_image('flow', make_grid(overlay_quiver(data['image'].cpu(), output['vessel'][:, 0:2].cpu(), quiverscale, normflow), nrow=4, normalize=True))
                     self.writer.add_image('flow_rev', make_grid(overlay_quiver(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), quiverscale, normflowrev), nrow=4, normalize=True))
                     self.writer.add_image('v2_vesselness_only', make_grid(self.vesselfunc(data['image'].cpu(), outputviz, vtype=vessel_type, \

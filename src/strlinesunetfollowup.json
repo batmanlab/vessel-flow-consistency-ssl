@@ -1,3 +1,0 @@
-#!/bin/bash
-source activate vesselseg
-python train.py -c configs/unet_strlines_followup.json --run_id $RUN_ID

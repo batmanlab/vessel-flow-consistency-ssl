@@ -9,8 +9,8 @@ import model.model as module_arch
 from parse_config import ConfigParser
 from trainer import VesselTrainer, COPDTrainer
 
-
 # fix random seeds for reproducibility
+# TODO: change this seed from config file instead of manually
 SEED = 123
 torch.manual_seed(SEED)
 torch.backends.cudnn.deterministic = True
@@ -38,6 +38,8 @@ def main(config):
     optimizer = config.init_obj('optimizer', torch.optim, trainable_params)
 
     lr_scheduler = config.init_obj('lr_scheduler', torch.optim.lr_scheduler, optimizer)
+
+    # Check if its a COPD trainer, then squeeze the input images
     squeeze = config['data_loader']['type']
     if 'COPD' in squeeze:
         squeeze = True
@@ -45,6 +47,7 @@ def main(config):
         squeeze = False
 
     print(config)
+    # Images are not 3d
     if '3d' not in config['loss']:
         trainer = VesselTrainer(model, criterion, metrics, optimizer,
                           config=config,
@@ -58,6 +61,7 @@ def main(config):
                           squeeze=squeeze,
                           valid_data_loader=valid_data_loader,
                           lr_scheduler=lr_scheduler)
+    # Run the trainer
     trainer.train()
 
 
