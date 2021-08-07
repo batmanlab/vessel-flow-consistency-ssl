@@ -1,5 +1,9 @@
 '''
-Use this script to generate threshold from the training set, and then use the test set to get metrics based on this threshold
+Use this script to generate threshold from the training set, 
+and then use the test set to get metrics based on this threshold
+
+Use for Frangi, Sato, Meijering, Hessian filters and our method 
+(saved in a file) for RITE dataset.
 '''
 import torch
 import pickle as pkl
@@ -29,23 +33,6 @@ parser.add_argument('--mode', type=str, default='test')
 
 def get_bbox_anno(filename):
     raise NotImplementedError
-    tree = ET.parse(filename)
-    root = tree.getroot()
-    objects = list(filter(lambda x: x.tag == 'object', list(root)))
-    bboxobj = list(map(lambda x: list(x), objects))
-    bboxobj = [x for sublist in bboxobj for x in sublist]
-    bboxobj = list(filter(lambda x: x.tag == 'bndbox', bboxobj))
-
-    bboxes = []
-    for box in bboxobj:
-        xy = list(box)
-        d = dict()
-        for _xy in xy:
-            d[_xy.tag] = int(_xy.text)
-        bbox = [d['xmin'], d['xmax'], d['ymin'], d['ymax']]
-        bboxes.append(bbox)
-    return bboxes
-
 
 def frangi_vesselness(img, i):
     ves = frangi(img, sigmas=np.linspace(1, 5, 5), black_ridges=True).astype(np.float32)
@@ -53,8 +40,6 @@ def frangi_vesselness(img, i):
 
 def meijering_vesselness(img, i):
     im  = img
-    # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-    # im = clahe.apply((img*255).astype(np.uint8))/255.0
     ves = meijering(im, sigmas=np.linspace(1, 5, 5), black_ridges=True, mode='constant').astype(np.float32)
     return ves
 
@@ -265,7 +250,7 @@ def print_all_test_metrics(ds, args, threshold):
     sens = []
     localacc = []
 
-    os.makedirs("hrf{}test".format(args.method), exist_ok=True)
+    os.makedirs("rite{}test".format(args.method), exist_ok=True)
     for i in range(len(ds)):
         img = ds[i]['image'][0].data.cpu().numpy()
         lab = (ds[i]['seg'][0].data.cpu().numpy() >= 0.5).astype(float)
@@ -277,10 +262,10 @@ def print_all_test_metrics(ds, args, threshold):
 
         # Difference image
         diffim = get_image_difference(vthres, lab)
-        diffim.save("hrf{}test/diff_{}.png".format(args.method, ds.images[i].split('/')[-1]))
+        diffim.save("rite{}test/diff_{}.png".format(args.method, ds.images[i].split('/')[-1]))
         # save it
         saveim = Image.fromarray((np.tile(255*vthres[:, :, None], (1, 1, 3))).astype(np.uint8))
-        saveim.save("hrf{}test/{}.png".format(args.method, ds.images[i].split('/')[-1]))
+        saveim.save("rite{}test/{}.png".format(args.method, ds.images[i].split('/')[-1]))
 
         # Get metrics
         auc.append(AUC(ves, lab))

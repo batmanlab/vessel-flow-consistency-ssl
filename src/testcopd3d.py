@@ -1,3 +1,11 @@
+''' 
+Test script for our learnt method for the COPD dataset. 
+The saved files are similar to the ones from `test3d.py` and the files
+can then be used for comparison using `get_all_metrics_<dataset>.py` script.
+
+The other difference from `test3d.py` is that since there are >9000 patients, and each patient 
+consists of a lot of patches, we must specify which patients to retrieve the results for.
+'''
 import argparse
 import numpy as np
 import torch

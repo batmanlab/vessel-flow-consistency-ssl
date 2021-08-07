@@ -1,3 +1,8 @@
+''' 
+Test script, for other baselines like Frangi, Sato, Hessian, Meijering vesselness methods
+for the IRCAD dataset. The saved files are similar to the ones from `test3d.py` and the files
+can then be used for comparison using `get_all_metrics_<dataset>.py` script.
+'''
 import argparse
 import numpy as np
 import torch
@@ -133,7 +138,6 @@ def main(config, args):
         meantime = np.mean(times)
         stdtime = np.std(times)
         print("Time for {}: {} +- {} sec".format(args.vesselfunc, meantime, stdtime))
-
 
 
 if __name__ == '__main__':

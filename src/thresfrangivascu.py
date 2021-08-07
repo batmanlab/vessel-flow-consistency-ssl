@@ -1,3 +1,8 @@
+''' 
+Test script to store Frangi resutls for the VascuSynth dataset. 
+To ensure a similar data structure (patchified data) as that from the learnt method, we artifically
+chop the vesselness image into patches before saving.
+'''
 import pickle as pkl
 import os
 from os import path as osp

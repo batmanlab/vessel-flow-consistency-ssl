@@ -1,3 +1,9 @@
+'''This script takes the output patches from the neural network,
+and patch them up into a single spatially-consistent 3D volume.
+
+Same as `stichpatchescopd` but for the radius maps. We can use the final radius map
+masked with the vesselness for color-coded visualization of the vessels.
+'''
 import pickle as pkl
 import torch
 from tqdm import tqdm

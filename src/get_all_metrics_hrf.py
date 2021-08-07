@@ -1,5 +1,9 @@
 '''
-Use this script to generate threshold from the training set, and then use the test set to get metrics based on this threshold
+Use this script to generate threshold from the training set, 
+and then use the test set to get metrics based on this threshold
+
+Use for Frangi, Sato, Meijering, Hessian filters and our method 
+(saved in a file) for HRF dataset.
 '''
 import torch
 import pickle as pkl
@@ -28,23 +32,6 @@ parser.add_argument('--mode', type=str, default='test')
 
 def get_bbox_anno(filename):
     raise NotImplementedError
-    tree = ET.parse(filename)
-    root = tree.getroot()
-    objects = list(filter(lambda x: x.tag == 'object', list(root)))
-    bboxobj = list(map(lambda x: list(x), objects))
-    bboxobj = [x for sublist in bboxobj for x in sublist]
-    bboxobj = list(filter(lambda x: x.tag == 'bndbox', bboxobj))
-
-    bboxes = []
-    for box in bboxobj:
-        xy = list(box)
-        d = dict()
-        for _xy in xy:
-            d[_xy.tag] = int(_xy.text)
-        bbox = [d['xmin'], d['xmax'], d['ymin'], d['ymax']]
-        bboxes.append(bbox)
-    return bboxes
-
 
 def frangi_vesselness(img, i):
     ves = frangi(img, sigmas=np.linspace(1, 5, 5), black_ridges=True).astype(np.float32)
@@ -52,8 +39,6 @@ def frangi_vesselness(img, i):
 
 def meijering_vesselness(img, i):
     im  = img
-    # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-    # im = clahe.apply((img*255).astype(np.uint8))/255.0
     ves = meijering(im, sigmas=np.linspace(1, 5, 5), black_ridges=True, mode='constant').astype(np.float32)
     return ves
 
@@ -300,11 +285,10 @@ def print_all_test_metrics(ds, args, threshold):
         ))
 
 
-
-
 def main():
     args = parser.parse_args()
     # Main function here
+    # TODO: Change file path here
     traindataset = HRFDataset("/ocean/projects/asc170022p/rohit33/HRF_dataset", train=True, augment=False)
 
     if args.threshold is None:
@@ -320,7 +304,6 @@ def main():
         get_anno_metrics(traindataset, args, threshold)
     else:
         raise NotImplementedError
-
 
 
 if __name__ == '__main__':

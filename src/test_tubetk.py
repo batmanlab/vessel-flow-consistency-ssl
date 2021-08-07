@@ -1,3 +1,7 @@
+''' 
+Test script, loads the trained model, loads the test data loader and saves the output vesselness patches
+These patches can be stitched together, and used for evaluation/visualization.
+'''
 import argparse
 import numpy as np
 import torch
@@ -16,11 +20,14 @@ from model.loss import v2_avg
 from time import time
 
 def to_device(data, device):
+    ''' Move all values in the dict to given device '''
     for k, v in data.items():
         data[k] = v.to(device)
     return data
 
 def smooth(ves, s=1):
+    # smooth the given image with gaussian filter
+    # loop across the batch and channel dimensions (although there is just one channel mostly)
     # image = [B, C, H, W]
     if s == 0:
         return ves
@@ -38,8 +45,12 @@ def smooth(ves, s=1):
 
 
 def main(config, args):
-    logger = config.get_logger('test')
+    # Main script
+    # Loads important things like logger, test dataloader, and trained model
+    # Next, we apply the network to all patches and save these results
+    # for further processing like stitching and evaluating
 
+    logger = config.get_logger('test')
     training = True if args.train else False
     trainstr = "train" if args.train != 0 else "test"
 
@@ -57,11 +68,8 @@ def main(config, args):
         offset=8,
     )
 
-    ## Vesselness function (3d versions only here)
-    ## TODO
-    if config.config['loss'] == 'vessel_loss_2d_sq':
-        vesselfunc = v2_sq_vesselness
-    elif config.config['loss'] == 'vessel_loss_3d':
+    ## Vesselness function (only 3d versions here)
+    if config.config['loss'] == 'vessel_loss_3d':
         vesselfunc = v13d_sq_vesselness_test
         #vesselfunc = v13d_sq_vesselness
     elif config.config['loss'] == 'vessel_loss_3d_bifurc':
@@ -70,8 +78,8 @@ def main(config, args):
         vesselfunc = v13d_sqmax_vesselness_test
     else:
         assert False, 'Unknown loss function {}'.format(config['loss'])
-    print(vesselfunc)
-    #input("Enter to continue. ")
+    # WARN: Can print the correct vessel function here
+    # print(vesselfunc)
 
     if 'max' in config['loss']:
         s = 1
@@ -191,9 +199,6 @@ def main(config, args):
                 # Add to patch
                 vesselness['img'][H:H+pH, W:W+pW, D:D+pD] = img + vesselness['img'][H:H+pH, W:W+pW, D:D+pD]
                 vesselness['count'][H:H+pH, W:W+pW, D:D+pD] = 1 + vesselness['count'][H:H+pH, W:W+pW, D:D+pD]
-
-                #print(vesselness['img'].min(), vesselness['img'].max(), vesselness['img'].mean(), )
-                #print(vesselness['count'].min(), vesselness['count'].max(), vesselness['count'].mean(), )
 
 
         # The last image wont be saved, save it here

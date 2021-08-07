@@ -1,5 +1,6 @@
 '''
-Given the .tre files and MRA image, generate the corresponding binary image
+In the TubeTK dataset, given the .tre files and MRA image, 
+generate the corresponding binary image for the ground truth vessels
 '''
 from data_loader.tubetkdataset import TubeTKDataset
 import os, sys

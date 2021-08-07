@@ -1,5 +1,9 @@
 '''
-Use this script to generate threshold from the training set, and then use the test set to get metrics based on this threshold
+Use this script to generate threshold from the training set, 
+and then use the test set to get metrics based on this threshold
+
+Use for Frangi, Sato, Meijering, Hessian filters and our method 
+(saved in a file) for DRIVE and STARE dataset
 '''
 import torch
 import pickle as pkl
@@ -26,6 +30,9 @@ parser.add_argument('--mode', type=str, default='test')
 parser.add_argument('--fold', type=int, default=-1)
 
 def get_bbox_anno(filename):
+    '''
+    Script to get out the rectangle parameters given a filename in XML format
+    '''
     tree = ET.parse(filename)
     root = tree.getroot()
     objects = list(filter(lambda x: x.tag == 'object', list(root)))
@@ -43,15 +50,12 @@ def get_bbox_anno(filename):
         bboxes.append(bbox)
     return bboxes
 
-
 def frangi_vesselness(img, i):
     ves = frangi(img, sigmas=np.linspace(1, 5, 5), black_ridges=True).astype(np.float32)
     return ves
 
 def meijering_vesselness(img, i):
     im  = img
-    # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-    # im = clahe.apply((img*255).astype(np.uint8))/255.0
     ves = meijering(im, sigmas=np.linspace(1, 5, 5), black_ridges=True).astype(np.float32)
     return ves
 
@@ -64,6 +68,7 @@ def hessian_vesselness(img, i):
     return ves
 
 def vesselness_file(filename):
+    '''Given a filename, open the vesselness which is stored as a tensor of size [B, 1, H, W]'''
     with open(filename, 'rb') as fi:
         data = pkl.load(fi)
     print("Using output from {}".format(filename))
@@ -72,15 +77,16 @@ def vesselness_file(filename):
         return V
     return v
 
-
-def AUC(ves, G, num=1000):
+def AUC(ves, G, num=None):
+    '''Calculate AUC from images'''
+    #TODO: remove `num` parameter without breaking code
     v = (ves - ves.min())/(ves.max() - ves.min())
     gt = G.astype(int)
     fpr, tpr, thres = metrics.roc_curve(gt.reshape(-1), v.reshape(-1), pos_label=1)
     return metrics.auc(fpr, tpr)
 
-
 def multiply_mask(ves, mask, takemin=True):
+    ''' Multiply vesselness with given mask of the image (to prevent edge artefacts) '''
     if takemin:
         m = ves.min()
     else:
@@ -89,8 +95,8 @@ def multiply_mask(ves, mask, takemin=True):
     ves[y, x] = m
     return ves - m
 
-
 def dice_score(a, b):
+    '''Calculate dice score b/w two images `a` and `b` '''
     if a.size == 0:
         return np.nan
 
@@ -98,8 +104,11 @@ def dice_score(a, b):
     den = a.mean() + b.mean() + 1e-100
     return num/den
 
-
 def get_best_dice_threshold(ves, gt, thres, step=10):
+    '''Given a sequence of threshold values, pick the one which gives best dice score
+    This code should be run on `ves` and `gt` from the validation set to choose
+    the best dice score
+    '''
     dicevals = []
     # Take dice values
     for t in thres[::step]:
@@ -112,7 +121,10 @@ def get_best_dice_threshold(ves, gt, thres, step=10):
 
 def compute_threshold(ds, gt, args):
     '''
-    From the dataset, determine threshold to maximize Dice
+    From the dataset, determine threshold to maximize Dice over the dataset
+    ds: Data loader
+    gt: Ground truth data loader
+    args: arguments for choosing vesselness method, fold (in k-fold validation)
     '''
     if args.method == 'frangi':
         vfunc = frangi_vesselness
@@ -130,17 +142,11 @@ def compute_threshold(ds, gt, args):
     Thres = []
     fold = args.fold
     for i in tqdm(range(len(ds))):
-        # Check fold
         if args.fold != -1:
             if i >= 4*fold and i - 4*fold < 4:
                 pass
             else:
                 continue
-        # if i == 5:
-            # break
-        #if i%5 == 0:
-            #print("Index {}".format(i))
-        # print(i)
         img = ds[i]['image'][0].data.cpu().numpy()
         lab = (gt[i]['image'][0].data.cpu().numpy() >= 0.5).astype(float)
         mask = ds[i]['mask'][0].data.cpu().numpy()
@@ -156,6 +162,9 @@ def accuracy(v, gt):
     return (v == gt).astype(float).mean()
 
 def localaccuracy(v, gt):
+    '''Accuracy only around a neighborhood region of the ground truth vessel
+    This metric helps to see how accurate the method is at the pixel level
+    '''
     gtdilate = binary_dilation(gt, np.ones((3, 3)))
     y, x = np.where(gtdilate > 0)
     acc = accuracy(v[y, x], gt[y, x])
@@ -173,7 +182,10 @@ def sensitivity(v, gt):
 
 
 def get_anno_metrics(ds, gt, args, threshold):
-    # Print dice for annotations
+    ''' Get all metrics for the given method (at bifurcation locations only)
+    This function gets the xml annotation file, and gets metrics like DICE, AUC,
+    and accuracy.
+    '''
     if args.method == 'frangi':
         vfunc = frangi_vesselness
     elif args.method == 'sato':
@@ -226,6 +238,9 @@ def get_anno_metrics(ds, gt, args, threshold):
 
 
 def get_image_difference(vthres, lab):
+    '''Get a color coded difference image between predicted and ground-truth 
+    vessel binary mask. Different colors are used for false positives, and false negatives.
+    '''
     # Get difference
     H, W = vthres.shape
     diff = np.zeros((H, W, 3))
@@ -246,9 +261,9 @@ def get_image_difference(vthres, lab):
     im = Image.fromarray(diff)
     return im
 
-
-
 def print_all_test_metrics(ds, gt, args, threshold):
+    ''' Self-explanatory function name
+    '''
     # Print things like accuracy, AUC, etc
     if args.method == 'frangi':
         vfunc = frangi_vesselness
@@ -304,12 +319,12 @@ def print_all_test_metrics(ds, gt, args, threshold):
               np.std(auc), 100*np.std(acc), np.std(dice), np.std(sens), np.std(spec), 100*np.std(localacc)
         ))
 
-
-
-
+''' Main function, first initialize the datasets, then either compute threshold 
+or use predefined threshold (saved from previous runs), and using that threshold
+calculate metrics for the test set.
+'''
 def main():
     args = parser.parse_args()
-    # Main function here
     traindataset = DriveDataset( "/pghbio/dbmi/batmanlab/rohit33/DRIVE/", train=True, augment=False)
     traingtdataset = DriveDataset( "/pghbio/dbmi/batmanlab/rohit33/DRIVE/", train=True, toy=True, augment=False)
 
@@ -333,7 +348,6 @@ def main():
         get_anno_metrics(testdataset, testgtdataset, args, threshold)
     else:
         raise NotImplementedError
-
 
 
 if __name__ == '__main__':

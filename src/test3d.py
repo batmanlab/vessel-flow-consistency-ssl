@@ -1,3 +1,7 @@
+''' 
+Test script, loads the trained model, loads the test data loader and saves the output vesselness images
+This is for all 3D datasets (VascuSynth, VESSEL12, COPD).
+'''
 import argparse
 import numpy as np
 import torch
@@ -15,10 +19,10 @@ from utils.util import *
 from model.loss import v2_avg
 
 def to_device(data, device):
+    # move to devices
     for k, v in data.items():
         data[k] = v.to(device)
     return data
-
 
 def smooth(ves, s=1):
     # image = [B, C, H, W]
@@ -35,6 +39,8 @@ def smooth(ves, s=1):
 
 
 def main(config, args):
+    ''' Main script, similar to `test.py` but for 3D datasets
+    '''
     logger = config.get_logger('test')
 
     training = True if args.train else False
@@ -52,7 +58,6 @@ def main(config, args):
     )
 
     ## Vesselness function (3d versions only here)
-    ## TODO
     if config.config['loss'] == 'vessel_loss_2d_sq':
         vesselfunc = v2_sq_vesselness
     elif config.config['loss'] == 'vessel_loss_3d':
@@ -65,8 +70,8 @@ def main(config, args):
     else:
         assert False, 'Unknown loss function {}'.format(config['loss'])
     print(vesselfunc)
-    #input("Press to continue")
 
+    # Same rule for smoothing sigma
     if 'max' in config['loss']:
         s = 1
     else:
@@ -92,7 +97,7 @@ def main(config, args):
     if config['n_gpu'] > 1:
         model = torch.nn.DataParallel(model)
 
-    # get nsamples
+    # get nsamples (this variable is the number of uniformly placed samples taken for interpolation)
     nsample = config['loss_args'].get('num_samples_template', 12)
 
     # Load model
@@ -124,7 +129,6 @@ def main(config, args):
             mask = data.get('mask')
             if mask is not None:
                 mask = mask.cpu()
-
 
             ## Change this for different vesselness modes
             ves = vesselfunc(data['image'], output, nsample=nsample, vtype=vessel_type, mask=mask, is_crosscorr=args.crosscorr, parallel_scale=parallel_scale, sv_range=sv_range)

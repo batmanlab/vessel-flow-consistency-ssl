@@ -1,3 +1,9 @@
+'''
+Use this script to generate threshold from the training set, 
+and then use the test set to get metrics based on this threshold
+
+Compare Frangi and our method (saved in different files) for TubeTK dataset
+'''
 import argparse
 import glob
 from os import path as osp
@@ -15,7 +21,6 @@ import argparse
 import cv2
 
 modify = lambda x, y: x
-
 parser = argparse.ArgumentParser()
 parser.add_argument('--method', type=str, default='frangi')
 parser.add_argument('--dir', type=str, default='/ocean/projects/asc170022p/rohit33/TubeTKoutput')
@@ -59,8 +64,6 @@ def dilategt(gt):
     mask[:, 1] = 1
     mask[:, :, 1] = 1
     return binary_dilation(gt, mask).astype(float)
-    #return binary_dilation(gt, np.ones((2, 2, 2))).astype(float)
-    #return gt
 
 def loadgt(gtfile):
     gt = np.load(gtfile)
@@ -84,14 +87,13 @@ def get_best_dice_threshold(ves, lab, thres):
     bestd = -1
     N = int(len(thres)/100.0)
     for t in (thres[::N]):
-        #d = dice(ves>=t , lab)
         vess = (ves>=t).astype(float)
         d = dice(vess, lab)
         if d > bestd:
             bestt = t
             bestd = d
 
-    # Get vesselness and rates
+    # Get vesselness and FP/FN rates
     vesbin = (ves >= bestt).astype(float)
     tpr, fpr, fnr = get_metrics(vesbin, lab)
 
@@ -101,7 +103,8 @@ def get_best_dice_threshold(ves, lab, thres):
 
 
 def get_threshold(gtfiles, ofiles,):
-    # Given list of ground truths and outputs, figure out (close to) optimal threshold
+    # Given list of ground truths and outputs, figure out the threshold which is
+    # (close to) optimal threshold
     thresvals = []
     for g, o in (list(zip(gtfiles, ofiles))):
         lab = loadgt(g)
@@ -111,51 +114,35 @@ def get_threshold(gtfiles, ofiles,):
         _bestthres = get_best_dice_threshold(ves, lab, thres)
         print()
         thresvals.append(_bestthres)
-
-        #auc = metrics.auc(fpr, tpr)
-        #thresvals.append(auc)
     return np.mean(thresvals)
 
 
 def modifyours(img, gtfile):
+    # Modify our method by subtracting from min value, masking out vesselness
+    # by the hull of the ROI
     m = img.min()
     hull = np.load(gtfile.replace('gt', 'hull'))
-    #print("Loading hull")
     img[hull == 0] = m
-    #img[0] = m
-    #img[-1] = m
-    #img[:, 0, :] = m
-    #img[:, -1, :] = m
-    #img[:, :, 0] = m
-    #img[:, :, -1] = m
     return img
-
 
 def main():
     global modify
     args = parser.parse_args()
-    #gtfiles = sorted(glob.glob(osp.join(args.dir, 'gt*npy')), key=getid)
     outputfiles = sorted(glob.glob(osp.join(args.dir, '{}*npy'.format(args.method))), key=getid)#[8:]
     gtfiles = [x.replace(args.method, 'gt') for x in outputfiles]
-    #print(outputfiles[0], gtfiles[0])
 
-    #if args.method == 'ours':
+    # modify the image using this method
     modify = modifyours
 
     N = 42
-    #auc = get_threshold(gtfiles[:N], outputfiles[:N])
-    #print("AUC: {}".format(auc))
-
     if args.threshold is None:
         thres = get_threshold(gtfiles[:N], outputfiles[:N])
     else:
         thres = args.threshold
     print("Threshold: {}".format(thres))
 
-    #alldice = []
     metrics = dict(dice=[], acc=[], sp=[], sc=[], auc=[])
     for g, o in tqdm(list(zip(gtfiles, outputfiles))):
-    #for g, o in tqdm(list(zip(gtfiles[N:], outputfiles[N:]))):
         gt = loadgt(g)
         outv = modify(np.load(o), g)
         out = (outv >= thres).astype(float)

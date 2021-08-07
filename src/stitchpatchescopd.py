@@ -1,3 +1,6 @@
+'''This script takes the output patches from the neural network,
+and patch them up into a single spatially-consistent 3D volume 
+'''
 import pickle as pkl
 from tqdm import tqdm
 import torch
@@ -9,6 +12,7 @@ from data_loader.copddataset import COPDDataset
 parser = argparse.ArgumentParser()
 parser.add_argument("--patientID", type=str, required=True)
 
+# specify patch size, and gaps between adjacent patches
 GAP=48
 PATCH=64
 

@@ -1,5 +1,5 @@
 '''
-Given the 2D images, convert into a 3D volume that can be re-used.
+Given the 2D images in the IRCAD dataset, convert into a 3D volume that can be re-used.
 '''
 import SimpleITK as sitk
 import numpy as np
@@ -12,7 +12,11 @@ def getid(filename):
     return int(filename.split('/')[-1].split('_')[-1])
 
 # Set main directory
-maindir = '/ocean/projects/asc170022p/rohit33/Liver/'
+## maindir = '/ocean/projects/asc170022p/rohit33/Liver/'
+maindir = None
+if maindir is None:
+    raise ValueError('maindir is not set. Please change it manually.')
+
 for r, dirs, files in os.walk(maindir):
     dirs = map(lambda x: osp.join(r, x), dirs)
     break

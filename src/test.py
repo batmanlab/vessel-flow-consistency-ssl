@@ -1,3 +1,7 @@
+''' 
+Test script, loads the trained model, loads the test data loader and saves the output vesselness images
+This is for all 2D datasets (DRIVE, STARE, HRF, RITE).
+'''
 import argparse
 import numpy as np
 import torch
@@ -19,9 +23,10 @@ def to_device(data, device):
         data[k] = v.to(device)
     return data
 
-
 def smooth(ves, s=1):
+    # Gaussian smooth the image (mostly used to smooth out the vessel fields, etc.)
     # image = [B, C, H, W]
+    # Iterate over the batch and channel dimensions and smooth out each image
     smoothves = ves * 0
     B, C, H, W = ves.shape
     for b in range(B):
@@ -38,14 +43,19 @@ def main(config, args):
     logger = config.get_logger('test')
 
     # setup data_loader instances
+    # Special case for STARE dataset since transfer learning experiments needed the trained model from DRIVE
+    # (given by its configuration file), 
+    # but the evaluation needed to be done on the STARE dataset
     if "STARE" in args.dataset:
         config['data_loader']['type'] = "STAREDataLoader"
         config['data_loader']['args']['data_dir'] = config['data_loader']['args']['data_dir'].replace('DRIVE', 'STARE')
 
-
+    # For training(val) or test dataset
     training = True if args.train else False
-    trainstr = "train" if args.train != 0 else "test"
 
+    # data loader 
+    # get data directory from the config, a large batch size for inference,
+    # and preprocessing mode
     data_loader = getattr(module_data, config['data_loader']['type'])(
         config['data_loader']['args']['data_dir'],
         batch_size=512,
@@ -82,15 +92,12 @@ def main(config, args):
         assert False, 'Unknown loss function {}'.format(config['loss'])
     print(vesselfunc)
 
+    # Different smoothness for max and non-max filters
     if 'max' in config['loss']:
         s = 1
     else:
         s = 0.7
     print("Smoothness {}".format(s))
-
-    ## Check with curved vesselness
-    # vesselfunc = v2_curved_vesselness
-    # parallel_scale = [10, 10]
 
     parallel_scale = config.config['loss_args'].get('parallel_scale', 2)
     sv_range = config.config['loss_args'].get('sv_range')
@@ -128,22 +135,13 @@ def main(config, args):
             #data, target = data.to(device), target.to(device)
             data = to_device(data, device)
             output = model(data)
-            #
-            # save sample images, or do something with output here
-            #
             vessel_type = config.get('vessel_type', 'light')
             mask = data.get('mask')
 
             # Change this for different vesselness modes
-            if True:
-                ves = vesselfunc(data['image'], output, vtype=vessel_type, mask=mask, is_crosscorr=args.crosscorr, parallel_scale=parallel_scale, sv_range=sv_range)
-                ves = ves.data.cpu().numpy()
-                ves = smooth(ves, s)
-            else:
-                ves = vesselfunc(data['image'], output, vtype=vessel_type, mask=mask, is_crosscorr=False, parallel_scale=parallel_scale, sv_range=sv_range)
-                ves = smooth(ves, s)
-                ves = v2_avg(ves, v2, vtype='light', mask=mask, is_crosscorr=False, parallel_scale=parallel_scale, sv_range=sv_range)
-                ves = ves.data.cpu().numpy()
+            ves = vesselfunc(data['image'], output, vtype=vessel_type, mask=mask, is_crosscorr=args.crosscorr, parallel_scale=parallel_scale, sv_range=sv_range)
+            ves = ves.data.cpu().numpy()
+            ves = smooth(ves, s)
 
             # Move outputs to CPU
             for k, v in output.items():
@@ -152,19 +150,13 @@ def main(config, args):
                 except:
                     pass
 
-            # Add the other frangi-like term
-            '''
-            ves2 = v2transpose_vesselness(data['image'].cpu(), output['vessel'][:, 2:4].cpu(), vtype=vessel_type, mask=mask, is_crosscorr=False)
-            ves2 = ves2.data.cpu().numpy()
-            ves = ves*np.exp(-ves2)
-            '''
-
             # computing loss, metrics on test set
             vfilename = input("Enter filename for vesselness. ")
             with open(vfilename, 'wb') as fi:
                 pkl.dump(ves, fi)
 
-            # store everything in another pickle file
+            # store other items like radius, vessel flow, etc. in another pickle file 
+            # for debugging and/or analysis
             analysisfilename = input("Enter filename to save analysis. ")
             with open(analysisfilename, 'wb') as fi:
                 torch.save({'data': data, 'output': output}, fi)

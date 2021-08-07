@@ -1,3 +1,9 @@
+''' 
+Test script (such as `test_tubetk.py`), loads the trained model, loads the test data loader and saves the output vesselness patches
+These patches can be stitched together, and used for evaluation/visualization.
+
+This script is for VESSEL12 dataset.
+'''
 import argparse
 import numpy as np
 import torch
@@ -53,21 +59,18 @@ def main(config, args):
         num_workers=2,
     )
 
-    ## Vesselness function (3d versions only here)
-    ## TODO
+    ## Vesselness function (3d versions)
     if config.config['loss'] == 'vessel_loss_2d_sq':
         vesselfunc = v2_sq_vesselness
     elif config.config['loss'] == 'vessel_loss_3d':
         vesselfunc = v13d_sq_vesselness_test
-        #vesselfunc = v13d_sq_vesselness
     elif config.config['loss'] == 'vessel_loss_3d_bifurc':
          vesselfunc = v13d_sq_jointvesselness
     elif config.config['loss'] == 'vessel_loss_3dmax':
         vesselfunc = v13d_sqmax_vesselness
     else:
         assert False, 'Unknown loss function {}'.format(config['loss'])
-    print(vesselfunc)
-    #input("Enter to continue. ")
+    # print(vesselfunc)
 
     if 'max' in config['loss']:
         s = 1
@@ -121,8 +124,6 @@ def main(config, args):
         for j, data in enumerate(tqdm(data_loader)):
             ## Get output from model
             data = to_device(data, device)
-            #for k, v in data.items():
-                #print(k, v.shape)
             output = model(data)
             ## Get vessels
             vessel_type = config.get('vessel_type', 'light')
@@ -135,15 +136,12 @@ def main(config, args):
             ves = vesselfunc(data['image'], output, nsample=nsample, vtype=vessel_type, mask=mask, is_crosscorr=args.crosscorr, parallel_scale=parallel_scale, sv_range=sv_range)
             t2 = time()
             ves = ves.data.cpu().numpy()
-            # If pad is zero,
+            # If non-zero padding, then take the extra padding out from all sides (minimizes border artifacts)
             if args.pad > 0:
                 ves = ves[..., pad:-pad, pad:-pad, pad:-pad]
 
             ves = smooth(ves, s)
-            #print(ves.shape)
             times.append(t2 - t1)
-            #print(t2 - t1)
-            #print(ves.shape)
 
             # From this vesselness, use it to add to current image
             B = ves.shape[0]
@@ -187,10 +185,6 @@ def main(config, args):
                 # Add to patch
                 vesselness['img'][H:H+pH, W:W+pW, D:D+pD] = img + vesselness['img'][H:H+pH, W:W+pW, D:D+pD]
                 vesselness['count'][H:H+pH, W:W+pW, D:D+pD] = 1 + vesselness['count'][H:H+pH, W:W+pW, D:D+pD]
-
-                #print(vesselness['img'].min(), vesselness['img'].max(), vesselness['img'].mean(), )
-                #print(vesselness['count'].min(), vesselness['count'].max(), vesselness['count'].mean(), )
-
 
         # The last image wont be saved, save it here
         v_id = vesselness['imgid']

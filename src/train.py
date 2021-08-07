@@ -47,7 +47,8 @@ def main(config):
         squeeze = False
 
     print(config)
-    # Images are not 3d
+    # For a 2D dataset, load the `VesselTrainer` instance with the given
+    # configuration 
     if '3d' not in config['loss']:
         trainer = VesselTrainer(model, criterion, metrics, optimizer,
                           config=config,
@@ -55,13 +56,16 @@ def main(config):
                           valid_data_loader=valid_data_loader,
                           lr_scheduler=lr_scheduler)
     else:
+        # For a 3D dataset, load the `COPDTrainer` instance with the given 
+        # configuration. The name is COPDTrainer, but its for all 3D datasets
         trainer = COPDTrainer(model, criterion, metrics, optimizer,
                           config=config,
                           data_loader=data_loader,
                           squeeze=squeeze,
                           valid_data_loader=valid_data_loader,
                           lr_scheduler=lr_scheduler)
-    # Run the trainer
+
+    # Finally run the trainer 
     trainer.train()
 
 

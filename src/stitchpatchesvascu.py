@@ -1,3 +1,8 @@
+'''This script takes the output patches from the neural network,
+and patch them up into a single spatially-consistent 3D volume.
+
+Same as `stichpatchescopd` but for VascuSynth dataset
+'''
 import pickle as pkl
 import os
 from os import path as osp

@@ -1,5 +1,8 @@
 '''
-Use this script to generate threshold from the training set, and then use the test set to get metrics based on this threshold
+Use this script to generate threshold from the training set, 
+and then use the test set to get metrics based on this threshold
+
+Compare Frangi and our method (saved in different files) for VascuSynth dataset
 '''
 import torch
 import pickle as pkl
@@ -31,7 +34,6 @@ def sato_vesselness(img, i):
     ves = sato(img, np.linspace(1, 12, 12), black_ridges=False).astype(np.float32)
     return ves
 
-
 def vesselness_file(filename):
     print("Loading from {}".format(filename))
     with open(filename, 'rb') as fi:
@@ -42,13 +44,11 @@ def vesselness_file(filename):
         return V
     return v
 
-
 def AUC(ves, G, num=1000):
     v = (ves - ves.min())/(ves.max() - ves.min())
     gt = G.astype(int)
     fpr, tpr, thres = metrics.roc_curve(gt.reshape(-1), v.reshape(-1), pos_label=1)
     return metrics.auc(fpr, tpr)
-
 
 def multiply_mask(ves, mask):
     m = 0
@@ -56,12 +56,10 @@ def multiply_mask(ves, mask):
     ves[y, x] = m
     return ves - m
 
-
 def dice_score(a, b):
     num = (2*a*b).mean()
     den = a.mean() + b.mean()
     return num/den
-
 
 def get_best_dice_threshold(ves, gt, thres, step=30):
     dicevals = []
@@ -72,7 +70,6 @@ def get_best_dice_threshold(ves, gt, thres, step=30):
         dicevals.append(d)
     idx = np.argmax(dicevals)
     return thres[step*idx]
-
 
 def compute_threshold(ds, args):
     '''
@@ -174,7 +171,6 @@ def print_all_test_metrics(ds, args, threshold):
     print("{:.2f} {:.2f} {:.2f} {:.2f}".format(
               np.std(auc), 100*np.std(acc), np.std(dice), np.std(sens), np.std(spec)
         ))
-
 
 
 

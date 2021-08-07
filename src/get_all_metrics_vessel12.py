@@ -1,3 +1,9 @@
+'''
+Use this script to generate threshold from the training set, 
+and then use the test set to get metrics based on this threshold
+
+Compare Frangi and our method for VESSEL12 dataset
+'''
 import argparse
 import glob
 import pandas as pd
@@ -46,13 +52,11 @@ def ppv(v, gt):
     fp = ((v == 1)&(gt == 0)).mean()
     return tp/(tp + fp)
 
-
 def auc(a, b):
-    # a = pred
+    # a is the prediction, b is the binary ground truth
     fpr, tpr, thres = metrics.roc_curve(b.reshape(-1), a.reshape(-1), pos_label=1)
     auc = metrics.auc(fpr, tpr)
     return auc
-
 
 def get_best_thres(pred, label):
     bestt = None
@@ -85,8 +89,7 @@ def main():
     N = 1
     bestthres = []
 
-    #for g, o in zip(gtfiles[:N], outputfiles[:N]):
-    for g, o in zip(gtfiles, outputfiles):
+    for g, o in zip(gtfiles[:N], outputfiles[:N]):
         #print(g, o)
         csv = np.array(pd.read_csv(g, header=None))
         x, y, z, label = csv.T # gt
@@ -98,7 +101,6 @@ def main():
 
     # Compute metrics
     metrics = dict(acc=[], auc=[], sp=[], sc=[], )
-    #bestthres = np.mean(bestthres)
 
     for i, (g, o) in enumerate(zip(gtfiles[N:], outputfiles[N:])):
         print(g, o)
@@ -108,7 +110,6 @@ def main():
         # Load image
         img = np.load(o)
         pred = (img[z, y, x] >= bestthres[i+N])
-        #pred = (img[z, y, x] >= bestthres)
         predv = img[z, y, x]
         # Save metrics
         metrics['acc'].append(100*accuracy(pred, label))
