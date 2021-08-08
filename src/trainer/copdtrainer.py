@@ -53,8 +53,6 @@ class COPDTrainer(BaseTrainer):
         self.train_metrics = MetricTracker('loss', *[m.__name__ for m in self.metric_ftns], writer=self.writer)
         self.valid_metrics = MetricTracker('loss', *[m.__name__ for m in self.metric_ftns], writer=self.writer)
 
-        # Change v2vesselness function here
-        # TODO
         if self.config['loss'] == 'vessel_loss_3d':
             self.vesselfunc = v13d_sq_vesselness
         elif self.config['loss'] == 'vessel_loss_3d_bifurc':
@@ -127,6 +125,7 @@ class COPDTrainer(BaseTrainer):
         if self.lr_scheduler is not None:
             self.lr_scheduler.step()
         return log
+
 
     def _valid_epoch(self, epoch):
         """

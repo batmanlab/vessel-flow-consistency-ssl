@@ -4,6 +4,7 @@ from torch.nn import functional as F
 
 from torchvision import models
 
+
 class DeepLabV3(nn.Module):
 
     def __init__(self, inp_channels=1, out_channels=4, vessel_scale_factor=16, bilinear=True):

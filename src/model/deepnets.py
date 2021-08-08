@@ -54,8 +54,6 @@ class Bottleneck(nn.Module):
         return out
 
 
-
-
 class ResNet(nn.Module):
     '''
     Modified ResNet to output an image

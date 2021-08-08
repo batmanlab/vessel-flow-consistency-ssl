@@ -1,11 +1,16 @@
+''' DEPRECATED: Use `loss.py` instead of this file. Most of loss functions use `v2` vesselness 
+instead of `v1` vesselness.
+'''
 import numpy as np
 import torch
 from torch import nn
 import torch.nn.functional as F
 import numpy as np
-from .loss import resample_from_flow_2d, LOSS_FNs, flow_consistency_2d, L2, L1
+from .loss import resample_from_flow_2d, LOSS_FNs, flow_consistency_2d, L2, L1, v1_sq_vesselness
 
 def v1_sqmax_vesselness(image, ves, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2):
+    ''' In this version, `v1` is the vessel direction, and `v2` is the perpendicular to the vessel direction
+    '''
     response1 = 0.0
     response2 = 0.0
     i_range1 = []
@@ -17,6 +22,9 @@ def v1_sqmax_vesselness(image, ves, nsample=12, vtype='light', mask=None, percen
 
     v1 = ves
     D = 0
+
+    ## Collect the response from both sides into `half-vessels`
+    # Then take the minimum response from both sides
     for sv in np.linspace(-parallel_scale, parallel_scale, nsample):
         # Get perp profile
         for s in np.linspace(-2, 2, nsample):
@@ -43,6 +51,7 @@ def v1_sqmax_vesselness(image, ves, nsample=12, vtype='light', mask=None, percen
         i_std2 = torch.cat(i_range2, 1)
         i_std2 = i_std2.std(1, unbiased=False) + 1e-5
         response2 = response2 / i_std2
+
     # Correct the response accordingly
     if vtype == 'light':
         response = torch.min(response1, response2)

@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from base import BaseModel
+
 class FCN32s(BaseModel):
 
     def __init__(self, inp_channels=3, out_channels=4):
@@ -95,8 +96,8 @@ class FCN32s(BaseModel):
             'vessel': out,
         }
 
-class FCN32sBranch(BaseModel):
 
+class FCN32sBranch(BaseModel):
     def __init__(self, inp_channels=3, out_channels=4):
         super(FCN32sBranch, self).__init__()
         self.inp_channels = inp_channels

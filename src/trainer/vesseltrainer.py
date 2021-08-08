@@ -8,7 +8,7 @@ from utils.util import *
 
 class VesselTrainer(BaseTrainer):
     """
-    Trainer class
+    2D Vessel Trainer class
 
     This trainer class is valid for all 2D datasets.
 
@@ -134,7 +134,6 @@ class VesselTrainer(BaseTrainer):
             mask = data.get('mask')
             if mask is not None:
                 mask = mask.cpu()
-
 
             # Create outputviz to have detached values
             outputviz = {}

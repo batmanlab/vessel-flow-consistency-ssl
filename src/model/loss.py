@@ -1,3 +1,7 @@
+''' Collection of loss functions
+
+Each function has some documentation within it, refer to those docstrings for more details.
+'''
 import numpy as np
 import torch
 from torch import nn
@@ -9,12 +13,11 @@ from model.copdloss import *
 def null_fn(*args):
     return None
 
-#print_fn = print
-print_fn = null_fn
+print_fn = null_fn     # Change this to `print` for debugging (didn't use a more sophisticated logger) 
 
 def self_supervised_loss(output, data, config):
-    '''
-    Simply take reconstruction loss of image to ground truth
+    ''' Use this loss for reconstruction (context-encoder, colorization, denoising attempt to recover
+    the final image). Use the `recon` head from the network.
     '''
     recon = output['recon']
     gt = data['gt']
@@ -24,8 +27,8 @@ def self_supervised_loss(output, data, config):
 
 
 def colorization_loss(output, data, config):
-    '''
-    Colorize the image
+    ''' Same as `self_supervised_loss` but use only 3 channels from the `vessel` head instead of
+    the `recon` head.
     '''
     recon = output['vessel'][:, :3]
     gt = data['gt']
@@ -50,14 +53,25 @@ def dice_loss(output, data, config):
 
 
 def self_supervised_image(image, output, *args, **kwargs):
-    """
-    Just return the reconstructed image
+    """ Just return the reconstructed image
     """
     return output['recon']
 
 
 # Output vesselness
 def v2vesselness(image, ves, nsample=20, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1=None, parallel_scale=2):
+    ''' Simple vesselness function which considers a straight line along the vesselness direction
+
+    Parameters
+    :image: The input images [B, 1, H, W]
+    :ves: The vessel direction scaled by radius for each pixel [B, 2, H, W]
+    :nsample: The number of samples to take along the vessel direction (default: 20)
+    :mask: Binary optional mask to mask out the vesselness (default: None)
+    :percentile: Deprecated
+    :is_crosscorr: If `True`, take normalized cross correlation instead of simple correlation (default: False)
+    :v1: Deprecated
+    :parallel_scale: Deprecated 
+    '''
     response = 0.0
     i_range = []
     for s in np.linspace(-2, 2, nsample):
@@ -65,7 +79,7 @@ def v2vesselness(image, ves, nsample=20, vtype='light', mask=None, percentile=10
         i_val = resample_from_flow_2d(image, s*ves)
         if is_crosscorr:
             i_range.append(i_val.detach()[:, None])
-        # Compute the convolution I * f
+        # Compute the convolution I * f (manually due to different per-pixel sampling)
         response = response + (i_val * filt)/nsample
 
     # Normalize
@@ -74,7 +88,7 @@ def v2vesselness(image, ves, nsample=20, vtype='light', mask=None, percentile=10
         i_std = i_range.std(1) + 1e-2    # [B, 1, H, W]
         response = response / i_std
 
-    # Correct the response accordingly
+    # Correct the response according to which type of vessels to detect
     if vtype == 'light':
         pass
     elif vtype == 'dark':
@@ -90,7 +104,23 @@ def v2vesselness(image, ves, nsample=20, vtype='light', mask=None, percentile=10
         response = response * mask
     return response
 
+
 def v2_avg(image, ves, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2):
+
+    ''' Vesselness function similar to `v2vesselness` but also uses the `v1` variable (which has the same magnitude as `ves`)
+    but is in a perpendicular direction.
+
+    Parameters
+    :image: The input images [B, 1, H, W]
+    :ves: The vessel direction scaled by radius for each pixel [B, 2, H, W]
+    :nsample: The number of samples to take along the vessel direction (default: 20)
+    :mask: Binary optional mask to mask out the vesselness (default: None)
+    :percentile: Deprecated
+    :is_crosscorr: If `True`, take normalized cross correlation instead of simple correlation (default: False)
+    :v1: Direction perpendicular to `ves` scaled by radius for each pixel [B, 2, H, W]
+    :parallel_scale: The scaling factor along the vessel direction and radius to take (default: 2)
+    The assumption is that the higher the scale, the straighter the vessels are, relative to the radius
+    '''
     response1 = 0.0
     response2 = 0.0
     i_range1 = []
@@ -138,6 +168,22 @@ def v2_avg(image, ves, nsample=12, vtype='light', mask=None, percentile=100, is_
 
 
 def v2_sqmax_vesselness(image, ves, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2):
+    ''' Vesselness function which considers two `half-vessels` and takes the minimum response.
+    This allows for a more robust vesselnesss metric and avoids a response to other structures like ridges
+    which are, loosely speaking, `one-sided vessels`
+
+    Parameters
+    :image: The input images [B, 1, H, W]
+    :ves: The vessel direction scaled by radius for each pixel [B, 2, H, W]
+    :nsample: The number of samples to take along the vessel direction (default: 20)
+    :mask: Binary optional mask to mask out the vesselness (default: None)
+    :percentile: Deprecated
+    :is_crosscorr: If `True`, take normalized cross correlation instead of simple correlation (default: False)
+    :v1: Deprecated (set within the function)
+    :parallel_scale: The scaling factor along the vessel direction and radius to take (default: 2)
+    The assumption is that the higher the scale, the straighter the vessels are, relative to the radius
+    So we do not want this to be too large.
+    '''
     response1 = 0.0
     response2 = 0.0
     i_range1 = []
@@ -170,16 +216,6 @@ def v2_sqmax_vesselness(image, ves, nsample=12, vtype='light', mask=None, percen
 
     # Normalize
     if is_crosscorr:
-        '''
-        # Average of both sides (normal)
-        i_range = torch.cat(i_range1 + i_range2, 1)
-        i_std = i_range.std(1, unbiased=False) + 1e-5
-        response = response / i_std / (nsample**2)
-        # Check assertion
-        idx = (-1 <= response)*(response <= 1)
-        idx = (~idx).sum().item()
-        assert idx == 0, '{} {}'.format(idx, np.prod(list(response.shape)))
-        '''
         # Take min of both sides
         i_std1 = torch.cat(i_range1, 1)
         i_std1 = i_std1.std(1, unbiased=False) + 1e-5
@@ -212,6 +248,21 @@ def v2_sqmax_vesselness(image, ves, nsample=12, vtype='light', mask=None, percen
 
 # Output vesselness over square filters
 def v2_sq_vesselness(image, ves, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2):
+    ''' Vesselness function like `v2_sqmax_vesselness` but takes the normal (cross-)correlation
+    instead of the robust version.
+
+    Parameters
+    :image: The input images [B, 1, H, W]
+    :ves: The vessel direction scaled by radius for each pixel [B, 2, H, W]
+    :nsample: The number of samples to take along the vessel direction (default: 20)
+    :mask: Binary optional mask to mask out the vesselness (default: None)
+    :percentile: Deprecated
+    :is_crosscorr: If `True`, take normalized cross correlation instead of simple correlation (default: False)
+    :v1: Deprecated (set within the function)
+    :parallel_scale: The scaling factor along the vessel direction and radius to take (default: 2)
+    The assumption is that the higher the scale, the straighter the vessels are, relative to the radius
+    So we do not want this to be too large.
+    '''
     response1 = 0.0
     response2 = 0.0
     i_range1 = []
@@ -289,6 +340,7 @@ LOSS_FNs = {
         'CE': CE,
 }
 
+''' Helper functions for resampling '''
 def get_grid(image):
     ''' Return an affine grid in range [-1, 1] '''
     B = image.shape[0]
@@ -345,6 +397,10 @@ def flow_consistency_2d(parent, child):
     '''
     Given a parent flow, and a child flow, we will output the difference
     Basically, we will output p(x) + c(p(x))
+    
+    Parameters
+    :parent: p(x) 
+    :child: c(x)
     '''
     B, C, H, W = parent.shape
     size = parent.size()
@@ -362,10 +418,18 @@ def flow_consistency_2d(parent, child):
     return parent + newchild
 
 
-# Losses for vessel losses
+# Losses for 2d vessel 
 def vessel_loss_2d(output, data, config):
-    '''
-    Master loss function of vessel self supervised learning
+    ''' DEPRECATED
+    Loss function of flow-based vessel self-supervised learning
+    The functions defined before are vesselness functions. However, the loss function
+    consists of vesselness loss, and other components like consistency losses.
+
+    Parameters:
+    :output: The outputs from the neural network which is a dict of keys and values which are tensors.
+    :data: Inputs to the neural network, which is a dict of keys and values
+    Contains image and other metadata
+    :config: Configuration from the config file provided by user
     '''
     args = config['loss_args']
     # Get all parameters
@@ -398,6 +462,7 @@ def vessel_loss_2d(output, data, config):
         loss = 0.0
         v1 = vessel[:, :2]
         v2 = vessel[:, 2:]
+
         # Intensity consistency loss
         if l_intensity:
             for scale in [0.2, 0.4, 0.6, 0.8, 1]:
@@ -412,6 +477,7 @@ def vessel_loss_2d(output, data, config):
                     L_childloss = L_loss(image, i_child, mask=mask)
                 # Add that loss
                 loss = loss + l_intensity * (L_loss(image, i_parent, mask=mask) + L_childloss)/5.0
+
         # Flow consistency loss
         if l_consistency:
             # If v1, v2 are supposed to be opposite directions
@@ -419,15 +485,18 @@ def vessel_loss_2d(output, data, config):
                 loss = loss + l_consistency * L2(flow_consistency_2d(v1, v2), mask=mask)
             else:
                 loss = loss + l_consistency * L2(flow_consistency_2d(v1, -v1), mask=mask)
+
         # Check for cosine similarity
         if l_cosine:
             if not cosineabs:
                 loss = loss + l_cosine * (1 + (mask * F.cosine_similarity(v1, v2)).mean())  # adding 1 so that minimum value of loss is 0
             else:
                 loss = loss + l_cosine * torch.abs(mask * F.cosine_similarity(v1, v2)).mean()
+
         # Check for decoder
         if l_decoder:
             loss = loss + l_decoder * L2(image, recon, mask=1)
+
         # Check for length of vector
         if l_length:
             v1norm = torch.sqrt((v1**2).sum(1) + eps)
@@ -437,13 +506,21 @@ def vessel_loss_2d(output, data, config):
     else:
         raise NotImplementedError
 
-    # Return loss
     return loss
 
 
 def vessel_loss_2d_dampen(output, data, config):
-    '''
-    Master loss function of vessel self supervised learning
+    ''' Loss function of flow-based vessel self-supervised learning
+    The functions defined before are vesselness functions. However, the loss function
+    consists of vesselness loss, and other components like consistency losses.
+
+    One can use the `sq` variants of the losses for better performance
+
+    Parameters:
+    :output: The outputs from the neural network which is a dict of keys and values which are tensors.
+    :data: Inputs to the neural network, which is a dict of keys and values
+    Contains image and other metadata
+    :config: Configuration from the config file provided by user
     '''
     args = config['loss_args']
     # Get all parameters
@@ -530,36 +607,6 @@ def vessel_loss_2d_dampen(output, data, config):
         if l_template:
             vessel_conv = v2vesselness(image, v2, num_samples_template, vessel_type, is_crosscorr=is_crosscorr)
             loss = loss + l_template * (1 - (mask*vessel_conv).mean())
-            # Check image values
-#             i_range = []
-#             for s in np.linspace(-2, 2, num_samples_template):
-#                 filt = 2*int(abs(s) < 1) - 1
-#                 i_val = resample_from_flow_2d(image, s*v2)   # image is [B, 1, H, W], so is i_val
-#                 # save it
-#                 if detach:
-#                     i_range.append(i_val.detach()[:, None])
-#                 else:
-#                     i_range.append(i_val[:, None])
-#                 # Compute the convolution I * f
-#                 vessel_conv = vessel_conv + i_val * filt
-
-#             # Calculate std if cross correlation
-#             if is_crosscorr:
-#                 i_range = torch.cat(i_range, 1)   # [B, 20, 1, H, W]
-#                 i_std = i_range.std(1) + 1e-10    # [B, 1, H, W]
-#                 vessel_conv = vessel_conv / i_std
-
-#             # Modify the vesselness according to parameters
-#             if vessel_type == 'light':
-#                 pass
-#             elif vessel_type == 'dark':
-#                 vessel_conv = -vessel_conv
-#             elif vessel_type == 'both':
-#                 vessel_conv = 2*torch.abs(vessel_conv)
-#             else:
-#                 raise NotImplementedError('{} keyword for vessel type is not supported'.format(vessel_type))
-
-#             loss = loss + l_template * (1 - (mask*vessel_conv).mean()/num_samples_template)
 
         # Check for vesselness in followup
         if l_followupv and l_template:
@@ -574,15 +621,27 @@ def vessel_loss_2d_dampen(output, data, config):
     return loss
 
 
-
-
 def vessel_loss_2d_sqmax(output, data, config):
+    ''' Robust vesselness variant of the sq vesselness 
+
+    Refer to documentation of `vessel_loss_2d_sq` for more details
+    '''
     return vessel_loss_2d_sq(output, data, config, maxfilter=True)
 
 
 def vessel_loss_2d_sq(output, data, config, maxfilter=False):
-    '''
-    Master loss function of vessel self supervised learning
+    ''' Loss function of flow-based vessel self-supervised learning
+    The functions defined before are vesselness functions. However, the loss function
+    consists of vesselness loss, and other components like consistency losses.
+
+    This loss is a stable performing variant.
+
+    Parameters:
+    :output: The outputs from the neural network which is a dict of keys and values which are tensors.
+    :data: Inputs to the neural network, which is a dict of keys and values
+    Contains image and other metadata
+    :config: Configuration from the config file provided by user
+    :maxfilter: Do we want to consider the max filter for robust vesselness? (default: False)
     '''
     args = config['loss_args']
     # Get all parameters
@@ -697,8 +756,15 @@ def vessel_loss_2d_sq(output, data, config, maxfilter=False):
 
 
 def vessel_loss_2d_path(output, data, config):
-    '''
-    Master loss function of vessel self supervised learning
+    ''' Loss function of flow-based vessel self-supervised learning with path length loss.
+    Experimental loss function used here. Still recommend using `vessel_loss_2d_sq[max|]>` 
+
+    Parameters:
+    :output: The outputs from the neural network which is a dict of keys and values which are tensors.
+    :data: Inputs to the neural network, which is a dict of keys and values
+    Contains image and other metadata
+    :config: Configuration from the config file provided by user
+    :maxfilter: Do we want to consider the max filter for robust vesselness? (default: False)
     '''
     args = config['loss_args']
     # Get all parameters
@@ -816,7 +882,10 @@ def vessel_loss_2d_path(output, data, config):
 
 
 def v2_path_vesselness(image, v2, nsample=10, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1=None):
-    ''' Calculate a path based vesselness '''
+    ''' Calculate a vesselness score, and then multiply it with displacement from the initial vesselness
+
+    This may have the unintended consequence of penalizing highly curved vessel regions
+    '''
     vessel_conv = v2vesselness(image, v2, nsample, vtype, is_crosscorr=is_crosscorr)
     vessel_conv = torch.max(vessel_conv, vessel_conv*0)
     H, W = image.shape[-2:]
@@ -854,9 +923,9 @@ def get_cross_corr(p1, p2):
 
 
 """
-####################################################################################
-HERE IS THE CURVED LOSS
-####################################################################################
+HERE ARE SOME LOSS FUNCTIONS FOR CURVED VESSELS - May have "sharp edges"
+Frameworks like neural ODEs have sharp edges, especially for an application 
+like this. Tread with caution.
 """
 # Output vesselness over variational filters
 def v2_curved_vesselness(image, ves, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1=None, parallel_scale=(4, 10)):
@@ -923,7 +992,6 @@ def v2_curved_vesselness(image, ves, nsample=12, vtype='light', mask=None, perce
     if mask is not None:
         response = response * mask
     return response
-
 
 
 # Auxiliary class for actually calculating the ODE
@@ -1008,7 +1076,6 @@ def v2_ode_vesselness(image, ves, nsample=12, vtype='light', mask=None, percenti
 ####
 ## CURVED VESSEL LOSS FUNCTIONS
 ####
-
 
 def vessel_loss_2d_ode(output, data, config):
     return vessel_loss_2d_curved(output, data, config, ode=True)
@@ -1118,9 +1185,11 @@ def vessel_loss_2d_curved(output, data, config, ode=False):
 
 
 def mutualinformation(image, ves, mask=None, bins=None, sigma_factor=0.5, epsilon=0):
-    # Global mutual information
+    # Global mutual information between image and vessel
+    # Not very useful because image generally contains much richer information
     if bins is None:
         bins = np.linspace(-1, 1, 20)
+
     # Get number of bins, sigma and normalizer
     numbins = len(bins)
     sigma = np.mean(np.abs(np.diff(bins))) * sigma_factor
@@ -1162,6 +1231,14 @@ def mutualinformation(image, ves, mask=None, bins=None, sigma_factor=0.5, epsilo
 
 
 def v1_sq_vesselness_test(image, output, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2, sv_range=None):
+    ''' Test vesselness script
+
+    This is similar to `v1_sq_vesselness` but during test time, we augment the vesselness with the angle between 
+    the vessel flow along the vessel. This penalizes noisy regions which look like vessels locally, but are not.
+    However, this can also penalize vessels that have a high curvature.
+
+    Refer to documentation of `v1_sq_vesselness` for more information.
+    '''
     v = v1_sq_vesselness(image, output, nsample, vtype, mask, percentile, is_crosscorr, v1, parallel_scale)
     #v = torch.exp(v)
     ves = output['vessel'][:, 2:4]
@@ -1181,6 +1258,10 @@ def v1_sq_vesselness_test(image, output, nsample=12, vtype='light', mask=None, p
 
 
 def v1_sq_vesselness(image, output, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2):
+    ''' A vesselness function similar to `v2_sq_vesselness` but uses the `v1` output instead.
+
+    Refer to the documentation of `v2_sq_vesselness` for more information.
+    '''
     response1 = 0.0
     response2 = 0.0
     i_range1 = []
@@ -1222,7 +1303,7 @@ def v1_sq_vesselness(image, output, nsample=12, vtype='light', mask=None, percen
     else:
         response = response / N
 
-    # Correct the response accordingly
+    # Correct the response according to the type of vessel requested
     if vtype == 'light':
         pass
     elif vtype == 'dark':
@@ -1239,6 +1320,14 @@ def v1_sq_vesselness(image, output, nsample=12, vtype='light', mask=None, percen
 
 
 def v1_sqmax_vesselness_test(image, output, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2, sv_range=None):
+    ''' Test vesselness script
+
+    This is similar to `v1_sqmax_vesselness` but during test time, we augment the vesselness with the angle between 
+    the vessel flow along the vessel. This penalizes noisy regions which look like vessels locally, but are not.
+    However, this can also penalize vessels that have a high curvature.
+
+    Refer to documentation of `v1_sqmax_vesselness` for more information.
+    '''
     v = v1_sqmax_vesselness(image, output, nsample, vtype, mask, percentile, is_crosscorr, v1, parallel_scale)
 
     ves = output['vessel'][:, 2:4]
@@ -1336,7 +1425,8 @@ def v1_sqmax_vesselness(image, output, nsample=12, vtype='light', mask=None, per
 
 
 def rotate_vector_2d(v1, theta):
-    '''
+    ''' Rotate a 2D vector field by an angle `theta`
+
     v1 is a vector of size [B, 2N, H, W] containing (x1, y1), ... (xn, yn)
     theta is a vector of size [B, 1, H, W] containing angle in radians
     '''
@@ -1362,9 +1452,15 @@ def rotate_vector_2d(v1, theta):
     return outv
 
 
+"""
+SOME LOSS FUNCTIONS FOR BIFURCATIONS IN VESSELS begin here.
+"""
+
 def v1_sqmax_bifurc(image, output, nsample=12, vtype='light', mask=None, percentile=100, is_crosscorr=False, v1 = None, parallel_scale=2, sv_range=None):
-    '''
-    Compute bifurcation vesselness separately
+    ''' Compute bifurcation vesselness separately
+
+    Similar arguments as `v1_sqmax_vesselness` but we consider 3 directions, by rotating the vector `vessel` by bifurcation angles `theta1` 
+    and `theta2`. Then the average of the 3 directions are taken.
     '''
     output1 = {}
     output2 = {}
