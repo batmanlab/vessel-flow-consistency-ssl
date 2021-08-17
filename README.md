@@ -2,8 +2,13 @@
 
 This is the code for the MICCAI 2021 paper **Self-Supervised Vessel Enhancement Using Flow-Based Consistencies**.
 
+## [Paper](https://arxiv.org/abs/2101.05145)
+
+![Framework](misc/frameworkv4.png)
+
+
 ## Installation
-Install the packages from `requirements.txt` file. In a virtual environment, use `pip` to install the required packages:
+Install the packages from `requirements.txt` file using `pip`. 
 ```
 pip install -r requirements.txt
 ```
